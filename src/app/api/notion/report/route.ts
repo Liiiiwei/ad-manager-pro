@@ -1,0 +1,39 @@
+import { NextRequest, NextResponse } from "next/server";
+import { fetchWindsor } from "@/lib/windsor/client";
+import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
+import { runFullAnalysis } from "@/lib/analysis/engine";
+import { buildDailyReportContent, buildReportTitle } from "@/lib/notion/report";
+
+export async function POST(request: NextRequest) {
+  const apiKey = request.headers.get("x-windsor-api-key");
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "缺少 Windsor API Key" },
+      { status: 401 },
+    );
+  }
+
+  try {
+    const body = await request.json();
+    const dateRange = body.dateRange || "last_7d";
+
+    // 取得資料並分析
+    const query = buildAdPerformanceQuery("all", dateRange);
+    const response = await fetchWindsor(apiKey, query);
+    const analysis = runFullAnalysis(response.data);
+
+    // 組裝報告內容
+    const title = buildReportTitle(analysis.dateRange);
+    const content = buildDailyReportContent(analysis);
+
+    // 回傳報告內容（前端透過 Notion MCP 建立頁面）
+    return NextResponse.json({
+      title,
+      content,
+      analysis,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "報告產生失敗";
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
