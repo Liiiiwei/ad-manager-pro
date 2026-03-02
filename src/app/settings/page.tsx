@@ -13,11 +13,14 @@ export default function SettingsPage() {
   const [testResult, setTestResult] = useState<"success" | "fail" | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Notion API Key state
+  // Notion 設定 state
   const [notionKeyInput, setNotionKeyInput] = useState("");
-  const [hasNotionKey, setHasNotionKey] = useState(false);
+  const [notionPageIdInput, setNotionPageIdInput] = useState("");
+  const [notionEnabled, setNotionEnabled] = useState(true);
+  const [hasNotionConfig, setHasNotionConfig] = useState(false);
   const [showNotionKey, setShowNotionKey] = useState(false);
   const [notionSaving, setNotionSaving] = useState(false);
+  const [notionSaveStatus, setNotionSaveStatus] = useState<"success" | "fail" | null>(null);
 
   // 閾值狀態
   const [thresholds, setThresholds] = useState<AnalysisThresholds>(DEFAULT_THRESHOLDS);
@@ -31,15 +34,27 @@ export default function SettingsPage() {
       setApiKeyInput(key);
     }
 
-    // Load Notion API Key
-    const notionKey = localStorage.getItem("notion_api_key");
-    if (notionKey) {
-      setHasNotionKey(true);
-      setNotionKeyInput(notionKey);
-    }
+    // 從 API 載入 Notion 設定
+    loadNotionSettings();
 
     setThresholds(getThresholds());
   }, []);
+
+  async function loadNotionSettings() {
+    try {
+      const res = await fetch("/api/settings/notion");
+      const data = await res.json();
+
+      if (data.configured) {
+        setHasNotionConfig(true);
+        setNotionPageIdInput(data.parentPageId || "");
+        setNotionEnabled(data.enabled ?? true);
+        // API Key 不完整顯示，僅用於檢查是否已設定
+      }
+    } catch (error) {
+      console.error("載入 Notion 設定失敗:", error);
+    }
+  }
 
   async function handleTest() {
     if (!apiKeyInput.trim()) return;
@@ -76,19 +91,60 @@ export default function SettingsPage() {
     setTestResult(null);
   }
 
-  // Notion API Key handlers
-  function handleNotionSave() {
-    if (!notionKeyInput.trim()) return;
+  // Notion 設定處理函式
+  async function handleNotionSave() {
+    if (!notionKeyInput.trim() || !notionPageIdInput.trim()) {
+      setNotionSaveStatus("fail");
+      setTimeout(() => setNotionSaveStatus(null), 3000);
+      return;
+    }
+
     setNotionSaving(true);
-    localStorage.setItem("notion_api_key", notionKeyInput.trim());
-    setHasNotionKey(true);
-    setTimeout(() => setNotionSaving(false), 500);
+    setNotionSaveStatus(null);
+
+    try {
+      const res = await fetch("/api/settings/notion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: notionKeyInput.trim(),
+          parentPageId: notionPageIdInput.trim(),
+          enabled: notionEnabled,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setHasNotionConfig(true);
+        setNotionSaveStatus("success");
+        // 清空 API Key 輸入框（已儲存到伺服器）
+        setNotionKeyInput("");
+        setTimeout(() => setNotionSaveStatus(null), 3000);
+      } else {
+        setNotionSaveStatus("fail");
+        setTimeout(() => setNotionSaveStatus(null), 3000);
+      }
+    } catch (error) {
+      console.error("儲存 Notion 設定失敗:", error);
+      setNotionSaveStatus("fail");
+      setTimeout(() => setNotionSaveStatus(null), 3000);
+    } finally {
+      setNotionSaving(false);
+    }
   }
 
-  function handleNotionClear() {
-    localStorage.removeItem("notion_api_key");
-    setNotionKeyInput("");
-    setHasNotionKey(false);
+  async function handleNotionClear() {
+    try {
+      await fetch("/api/settings/notion", { method: "DELETE" });
+      setNotionKeyInput("");
+      setNotionPageIdInput("");
+      setNotionEnabled(true);
+      setHasNotionConfig(false);
+      setNotionSaveStatus(null);
+    } catch (error) {
+      console.error("清除 Notion 設定失敗:", error);
+    }
   }
 
   // 更新閾值的 helper
@@ -221,89 +277,37 @@ export default function SettingsPage() {
           設定自動每日同步廣告報告到 Notion。系統會在每天固定時間自動產生報告並建立 Notion 頁面。
         </p>
 
-        {/* 環境變數設定說明 */}
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-          <h4 className="text-xs font-semibold text-amber-900 mb-2">⚙️ 環境變數設定（Zeabur）</h4>
-          <p className="text-xs text-amber-800 mb-3">
-            自動同步功能需要在 Zeabur Dashboard 設定以下環境變數：
-          </p>
-          <div className="space-y-2">
-            <div className="bg-white rounded px-2 py-1.5">
-              <code className="text-xs font-mono text-gray-800">WINDSOR_API_KEY</code>
-              <span className="text-xs text-muted ml-2">= 你的 Windsor.ai API Key</span>
-            </div>
-            <div className="bg-white rounded px-2 py-1.5">
-              <code className="text-xs font-mono text-gray-800">NOTION_API_KEY</code>
-              <span className="text-xs text-muted ml-2">= Notion Integration Token</span>
-            </div>
-            <div className="bg-white rounded px-2 py-1.5">
-              <code className="text-xs font-mono text-gray-800">NOTION_PARENT_PAGE_ID</code>
-              <span className="text-xs text-muted ml-2">= 報告要建立在哪個頁面下</span>
-            </div>
-            <div className="bg-white rounded px-2 py-1.5">
-              <code className="text-xs font-mono text-gray-800">CRON_SCHEDULE</code>
-              <span className="text-xs text-muted ml-2">= 0 9 * * * （每天 9:00，選填）</span>
-            </div>
-            <div className="bg-white rounded px-2 py-1.5">
-              <code className="text-xs font-mono text-gray-800">ENABLE_AUTO_SYNC</code>
-              <span className="text-xs text-muted ml-2">= true（啟用自動同步，選填）</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 設定步驟 */}
-        <div className="mt-4 pt-4 border-t border-card-border">
-          <h4 className="text-xs font-semibold text-foreground mb-2">📖 設定步驟</h4>
-          <ol className="text-xs text-muted space-y-2 pl-4 list-decimal">
+        {/* 設定步驟說明 */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <h4 className="text-xs font-semibold text-blue-900 mb-2">📖 設定步驟</h4>
+          <ol className="text-xs text-blue-800 space-y-2 pl-4 list-decimal">
             <li>
-              <strong>建立 Notion Integration</strong>
-              <ul className="list-disc pl-4 mt-1 space-y-1">
-                <li>前往 <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">Notion Integrations</a></li>
-                <li>點擊 "New integration"，設定名稱（例如：Ad Manager Pro）</li>
-                <li>複製 "Internal Integration Token" 作為 <code className="px-1 bg-gray-100 rounded">NOTION_API_KEY</code></li>
-              </ul>
+              前往 <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline font-medium">Notion Integrations</a>，建立 Integration 並複製 API Key
             </li>
             <li>
-              <strong>建立 Notion Parent Page</strong>
-              <ul className="list-disc pl-4 mt-1 space-y-1">
-                <li>在 Notion 中建立一個新頁面（例如：「廣告報告」）</li>
-                <li>點擊頁面右上角的 "Share" → "Invite"，邀請剛才建立的 Integration</li>
-                <li>從頁面 URL 複製 Page ID（32 位字串）作為 <code className="px-1 bg-gray-100 rounded">NOTION_PARENT_PAGE_ID</code></li>
-              </ul>
+              在 Notion 建立一個頁面（例如：「廣告報告」），邀請剛才建立的 Integration，並複製頁面 URL 中的 Page ID（32 位字串）
             </li>
             <li>
-              <strong>在 Zeabur 設定環境變數</strong>
-              <ul className="list-disc pl-4 mt-1 space-y-1">
-                <li>登入 Zeabur Dashboard → 選擇專案 → 進入 "Variables" 設定</li>
-                <li>新增上述所有環境變數</li>
-                <li>儲存後重新部署應用</li>
-              </ul>
-            </li>
-            <li>
-              <strong>測試同步</strong>
-              <ul className="list-disc pl-4 mt-1 space-y-1">
-                <li>部署完成後，使用手動觸發 API 測試：<code className="px-1 bg-gray-100 rounded">POST /api/sync-notion</code></li>
-                <li>檢查 Notion Parent Page 下是否成功建立新報告頁面</li>
-                <li>查看 Zeabur Logs 確認 Cron Job 是否正常註冊</li>
-              </ul>
+              在下方輸入 API Key 和 Page ID，點擊儲存即可啟用自動同步
             </li>
           </ol>
         </div>
 
-        {/* 手動觸發區塊（僅供前端手動操作保留） */}
-        <div className="mt-4 pt-4 border-t border-card-border">
-          <h4 className="text-xs font-semibold text-foreground mb-2">🔧 前端手動操作（選用）</h4>
-          <p className="text-xs text-muted mb-3">
-            以下設定僅供在前端使用 Claude Code 手動產生報告時使用，與自動同步功能無關。
-          </p>
-
-          <div className="flex gap-2 mb-3">
+        {/* Notion API Key 輸入 */}
+        <div className="mb-3">
+          <label className="text-xs font-medium text-foreground mb-1.5 block">
+            Notion API Key
+          </label>
+          <div className="flex gap-2">
             <div className="flex-1 relative">
               <input
                 type={showNotionKey ? "text" : "password"}
                 value={notionKeyInput}
-                onChange={(e) => setNotionKeyInput(e.target.value)}
-                placeholder="貼上你的 Notion API Key（選用）..."
+                onChange={(e) => {
+                  setNotionKeyInput(e.target.value);
+                  setNotionSaveStatus(null);
+                }}
+                placeholder={hasNotionConfig ? "留空代表不變更..." : "貼上你的 Notion Integration Token..."}
                 className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent pr-10"
               />
               <button
@@ -325,25 +329,87 @@ export default function SettingsPage() {
               </button>
             </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleNotionSave}
-              disabled={!notionKeyInput.trim() || notionSaving}
-              className="px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              {notionSaving ? "已儲存" : "儲存"}
-            </button>
-            {hasNotionKey && (
-              <button
-                onClick={handleNotionClear}
-                className="px-4 py-2 text-sm text-danger hover:bg-red-50 rounded-lg transition-colors"
-              >
-                清除
-              </button>
-            )}
-          </div>
         </div>
+
+        {/* Notion Parent Page ID 輸入 */}
+        <div className="mb-3">
+          <label className="text-xs font-medium text-foreground mb-1.5 block">
+            Notion Parent Page ID
+          </label>
+          <input
+            type="text"
+            value={notionPageIdInput}
+            onChange={(e) => {
+              setNotionPageIdInput(e.target.value);
+              setNotionSaveStatus(null);
+            }}
+            placeholder="貼上 Notion 頁面 ID（32 位字串）..."
+            className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          />
+          <p className="text-xs text-muted mt-1">
+            從 Notion 頁面 URL 複製，例如：abc123def456...
+          </p>
+        </div>
+
+        {/* 啟用/停用 Toggle */}
+        <div className="mb-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={notionEnabled}
+              onChange={(e) => setNotionEnabled(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
+            />
+            <span className="text-xs text-foreground">啟用自動同步</span>
+          </label>
+        </div>
+
+        {/* 儲存/清除按鈕 */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleNotionSave}
+            disabled={notionSaving}
+            className="px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            {notionSaving ? "儲存中..." : "儲存設定"}
+          </button>
+          {hasNotionConfig && (
+            <button
+              onClick={handleNotionClear}
+              className="px-4 py-2 text-sm text-danger hover:bg-red-50 rounded-lg transition-colors"
+            >
+              清除設定
+            </button>
+          )}
+        </div>
+
+        {/* 儲存狀態顯示 */}
+        {notionSaveStatus === "success" && (
+          <div className="mt-3 flex items-center gap-2 text-success text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            Notion 設定已儲存！自動同步將在下次排程時間執行
+          </div>
+        )}
+        {notionSaveStatus === "fail" && (
+          <div className="mt-3 flex items-center gap-2 text-danger text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            儲存失敗，請確認 API Key 和 Page ID 是否正確
+          </div>
+        )}
+
+        {/* 已設定提示 */}
+        {hasNotionConfig && (
+          <div className="mt-3 flex items-center gap-2 text-muted text-xs">
+            <svg className="w-4 h-4 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            已設定 Notion 連結，自動同步{notionEnabled ? "已啟用" : "已停用"}
+          </div>
+        )}
       </section>
 
       {/* 分析閾值 */}
