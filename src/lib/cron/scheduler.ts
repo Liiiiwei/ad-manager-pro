@@ -42,7 +42,6 @@ export function initCronJobs(): void {
       await syncToNotion();
     },
     {
-      scheduled: true,
       timezone: process.env.TZ || "UTC",
     }
   );
