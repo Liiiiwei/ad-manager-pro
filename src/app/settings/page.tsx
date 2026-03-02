@@ -1,153 +1,153 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { getApiKey, setApiKey, clearApiKey } from "@/hooks/use-windsor-data";
-import { DEFAULT_THRESHOLDS, getThresholds, saveThresholds } from "@/lib/analysis/thresholds";
+import { DEFAULT_THRESHOLDS } from "@/lib/analysis/thresholds";
 import type { AnalysisThresholds } from "@/lib/analysis/types";
 
 export default function SettingsPage() {
-  const [apiKeyInput, setApiKeyInput] = useState("");
-  const [hasApiKey, setHasApiKey] = useState(false);
-  const [showKey, setShowKey] = useState(false);
-  const [testing, setTesting] = useState(false);
-  const [testResult, setTestResult] = useState<"success" | "fail" | null>(null);
-  const [saving, setSaving] = useState(false);
+  // Windsor 設定
+  const [windsorApiKey, setWindsorApiKey] = useState("");
+  const [windsorDateRange, setWindsorDateRange] = useState("last_7d");
+  const [showWindsorKey, setShowWindsorKey] = useState(false);
 
-  // Notion 設定 state
-  const [notionKeyInput, setNotionKeyInput] = useState("");
-  const [notionPageIdInput, setNotionPageIdInput] = useState("");
+  // Notion 設定
+  const [notionApiKey, setNotionApiKey] = useState("");
+  const [notionParentPageId, setNotionParentPageId] = useState("");
   const [notionEnabled, setNotionEnabled] = useState(true);
   const [hasNotionConfig, setHasNotionConfig] = useState(false);
   const [showNotionKey, setShowNotionKey] = useState(false);
-  const [notionSaving, setNotionSaving] = useState(false);
-  const [notionSaveStatus, setNotionSaveStatus] = useState<"success" | "fail" | null>(null);
 
-  // 閾值狀態
+  // 排程設定
+  const [cronExpression, setCronExpression] = useState("0 9 * * *");
+  const [timezone, setTimezone] = useState("Asia/Taipei");
+  const [scheduleEnabled, setScheduleEnabled] = useState(true);
+  const [hasScheduleConfig, setHasScheduleConfig] = useState(false);
+  const [nextRunAt, setNextRunAt] = useState<string | null>(null);
+  const [lastRunAt, setLastRunAt] = useState<string | null>(null);
+
+  // 閾值設定
   const [thresholds, setThresholds] = useState<AnalysisThresholds>(DEFAULT_THRESHOLDS);
-  const [thresholdSaving, setThresholdSaving] = useState(false);
   const [thresholdDirty, setThresholdDirty] = useState(false);
 
+  // UI 狀態
+  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"success" | "fail" | null>(null);
+
   useEffect(() => {
-    const key = getApiKey();
-    if (key) {
-      setHasApiKey(true);
-      setApiKeyInput(key);
-    }
-
-    // 從 API 載入 Notion 設定
-    loadNotionSettings();
-
-    setThresholds(getThresholds());
+    loadSettings();
+    loadSchedule();
   }, []);
 
-  async function loadNotionSettings() {
+  async function loadSettings() {
     try {
-      const res = await fetch("/api/settings/notion");
+      const res = await fetch("/api/settings");
+      const data = await res.json();
+
+      // Windsor 設定
+      if (data.windsor) {
+        setWindsorDateRange(data.windsor.dateRange || "last_7d");
+        // API Key 是 masked，不需要顯示
+      }
+
+      // Notion 設定
+      if (data.notion) {
+        setHasNotionConfig(data.notion.configured);
+        setNotionParentPageId(data.notion.parentPageId || "");
+        setNotionEnabled(data.notion.enabled ?? true);
+      }
+
+      // 閾值設定
+      if (data.thresholds) {
+        setThresholds(data.thresholds);
+      }
+    } catch (error) {
+      console.error("載入設定失敗:", error);
+    }
+  }
+
+  async function loadSchedule() {
+    try {
+      const res = await fetch("/api/settings/schedule");
       const data = await res.json();
 
       if (data.configured) {
-        setHasNotionConfig(true);
-        setNotionPageIdInput(data.parentPageId || "");
-        setNotionEnabled(data.enabled ?? true);
-        // API Key 不完整顯示，僅用於檢查是否已設定
+        setHasScheduleConfig(true);
+        setCronExpression(data.cronExpression || "0 9 * * *");
+        setTimezone(data.timezone || "Asia/Taipei");
+        setScheduleEnabled(data.enabled ?? true);
+        setNextRunAt(data.nextRunAt);
+        setLastRunAt(data.lastRunAt);
       }
     } catch (error) {
-      console.error("載入 Notion 設定失敗:", error);
+      console.error("載入排程設定失敗:", error);
     }
   }
 
-  async function handleTest() {
-    if (!apiKeyInput.trim()) return;
-    setTesting(true);
-    setTestResult(null);
-
-    try {
-      const res = await fetch("/api/windsor/test", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
-      });
-      const data = await res.json();
-      setTestResult(data.valid ? "success" : "fail");
-    } catch {
-      setTestResult("fail");
-    } finally {
-      setTesting(false);
-    }
-  }
-
-  function handleSave() {
-    if (!apiKeyInput.trim()) return;
+  async function handleSaveAll() {
     setSaving(true);
-    setApiKey(apiKeyInput.trim());
-    setHasApiKey(true);
-    setTimeout(() => setSaving(false), 500);
-  }
-
-  function handleClear() {
-    clearApiKey();
-    setApiKeyInput("");
-    setHasApiKey(false);
-    setTestResult(null);
-  }
-
-  // Notion 設定處理函式
-  async function handleNotionSave() {
-    if (!notionKeyInput.trim() || !notionPageIdInput.trim()) {
-      setNotionSaveStatus("fail");
-      setTimeout(() => setNotionSaveStatus(null), 3000);
-      return;
-    }
-
-    setNotionSaving(true);
-    setNotionSaveStatus(null);
+    setSaveStatus(null);
 
     try {
-      const res = await fetch("/api/settings/notion", {
-        method: "POST",
+      // 1. 儲存基本設定（Windsor + Notion + 閾值）
+      const settingsRes = await fetch("/api/settings", {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKey: notionKeyInput.trim(),
-          parentPageId: notionPageIdInput.trim(),
-          enabled: notionEnabled,
+          windsor: {
+            apiKey: windsorApiKey || undefined,
+            dateRange: windsorDateRange,
+          },
+          notion: {
+            apiKey: notionApiKey || undefined,
+            parentPageId: notionParentPageId || undefined,
+            enabled: notionEnabled,
+          },
+          thresholds: thresholds,
         }),
       });
 
-      const data = await res.json();
-
-      if (res.ok && data.success) {
-        setHasNotionConfig(true);
-        setNotionSaveStatus("success");
-        // 清空 API Key 輸入框（已儲存到伺服器）
-        setNotionKeyInput("");
-        setTimeout(() => setNotionSaveStatus(null), 3000);
-      } else {
-        setNotionSaveStatus("fail");
-        setTimeout(() => setNotionSaveStatus(null), 3000);
+      if (!settingsRes.ok) {
+        throw new Error("儲存設定失敗");
       }
+
+      // 2. 儲存排程設定
+      const scheduleRes = await fetch("/api/settings/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cronExpression,
+          timezone,
+          enabled: scheduleEnabled,
+        }),
+      });
+
+      if (!scheduleRes.ok) {
+        throw new Error("儲存排程失敗");
+      }
+
+      const scheduleData = await scheduleRes.json();
+
+      // 更新狀態
+      setHasNotionConfig(true);
+      setHasScheduleConfig(true);
+      setNextRunAt(scheduleData.schedule?.nextRunAt || null);
+      setThresholdDirty(false);
+      setSaveStatus("success");
+
+      // 清空 API Key 輸入框（已儲存）
+      setWindsorApiKey("");
+      setNotionApiKey("");
+
+      setTimeout(() => setSaveStatus(null), 3000);
     } catch (error) {
-      console.error("儲存 Notion 設定失敗:", error);
-      setNotionSaveStatus("fail");
-      setTimeout(() => setNotionSaveStatus(null), 3000);
+      console.error("儲存失敗:", error);
+      setSaveStatus("fail");
+      setTimeout(() => setSaveStatus(null), 3000);
     } finally {
-      setNotionSaving(false);
+      setSaving(false);
     }
   }
 
-  async function handleNotionClear() {
-    try {
-      await fetch("/api/settings/notion", { method: "DELETE" });
-      setNotionKeyInput("");
-      setNotionPageIdInput("");
-      setNotionEnabled(true);
-      setHasNotionConfig(false);
-      setNotionSaveStatus(null);
-    } catch (error) {
-      console.error("清除 Notion 設定失敗:", error);
-    }
-  }
-
-  // 更新閾值的 helper
   function updateThreshold(
     group: keyof AnalysisThresholds,
     key: string,
@@ -160,17 +160,9 @@ export default function SettingsPage() {
     setThresholdDirty(true);
   }
 
-  function handleSaveThresholds() {
-    setThresholdSaving(true);
-    saveThresholds(thresholds);
-    setThresholdDirty(false);
-    setTimeout(() => setThresholdSaving(false), 500);
-  }
-
   function handleResetThresholds() {
     setThresholds(DEFAULT_THRESHOLDS);
-    saveThresholds(DEFAULT_THRESHOLDS);
-    setThresholdDirty(false);
+    setThresholdDirty(true);
   }
 
   return (
@@ -194,87 +186,62 @@ export default function SettingsPage() {
           {" "}取得。
         </p>
 
-        <div className="flex gap-2 mb-3">
-          <div className="flex-1 relative">
-            <input
-              type={showKey ? "text" : "password"}
-              value={apiKeyInput}
-              onChange={(e) => {
-                setApiKeyInput(e.target.value);
-                setTestResult(null);
-              }}
-              placeholder="貼上你的 API Key..."
-              className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent pr-10"
-            />
-            <button
-              type="button"
-              onClick={() => setShowKey(!showKey)}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground"
-              title={showKey ? "隱藏" : "顯示"}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {showKey ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
-                ) : (
-                  <>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                  </>
-                )}
-              </svg>
-            </button>
+        <div className="mb-3">
+          <label className="text-xs font-medium text-foreground mb-1.5 block">
+            API Key
+          </label>
+          <div className="flex gap-2">
+            <div className="flex-1 relative">
+              <input
+                type={showWindsorKey ? "text" : "password"}
+                value={windsorApiKey}
+                onChange={(e) => setWindsorApiKey(e.target.value)}
+                placeholder="貼上你的 Windsor API Key..."
+                className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowWindsorKey(!showWindsorKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground"
+                title={showWindsorKey ? "隱藏" : "顯示"}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {showWindsorKey ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+                  ) : (
+                    <>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </>
+                  )}
+                </svg>
+              </button>
+            </div>
           </div>
+          <p className="text-xs text-muted mt-1">留空代表不變更現有設定</p>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleTest}
-            disabled={!apiKeyInput.trim() || testing}
-            className="px-4 py-2 text-sm bg-gray-100 text-foreground rounded-lg hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        <div className="mb-3">
+          <label className="text-xs font-medium text-foreground mb-1.5 block">
+            日期範圍
+          </label>
+          <select
+            value={windsorDateRange}
+            onChange={(e) => setWindsorDateRange(e.target.value)}
+            className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            {testing ? "測試中..." : "測試連線"}
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!apiKeyInput.trim() || saving}
-            className="px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {saving ? "已儲存" : "儲存"}
-          </button>
-          {hasApiKey && (
-            <button
-              onClick={handleClear}
-              className="px-4 py-2 text-sm text-danger hover:bg-red-50 rounded-lg transition-colors"
-            >
-              清除
-            </button>
-          )}
+            <option value="last_7d">過去 7 天</option>
+            <option value="last_14d">過去 14 天</option>
+            <option value="last_30d">過去 30 天</option>
+          </select>
         </div>
-
-        {/* 測試結果 */}
-        {testResult === "success" && (
-          <div className="mt-3 flex items-center gap-2 text-success text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            連線成功！API Key 有效
-          </div>
-        )}
-        {testResult === "fail" && (
-          <div className="mt-3 flex items-center gap-2 text-danger text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            連線失敗，請檢查 API Key 是否正確
-          </div>
-        )}
       </section>
 
       {/* Notion 自動同步設定 */}
       <section className="bg-card border border-card-border rounded-xl p-6 mb-6">
         <h3 className="text-sm font-semibold text-foreground mb-1">Notion 自動同步設定</h3>
         <p className="text-xs text-muted mb-4">
-          設定自動每日同步廣告報告到 Notion。系統會在每天固定時間自動產生報告並建立 Notion 頁面。
+          設定自動每日同步廣告報告到 Notion。系統會根據你設定的排程時間自動產生報告並建立 Notion 頁面。
         </p>
 
         {/* 設定步驟說明 */}
@@ -288,7 +255,7 @@ export default function SettingsPage() {
               在 Notion 建立一個頁面（例如：「廣告報告」），邀請剛才建立的 Integration，並複製頁面 URL 中的 Page ID（32 位字串）
             </li>
             <li>
-              在下方輸入 API Key 和 Page ID，點擊儲存即可啟用自動同步
+              在下方輸入 API Key 和 Page ID，設定排程時間，點擊儲存即可啟用自動同步
             </li>
           </ol>
         </div>
@@ -302,11 +269,8 @@ export default function SettingsPage() {
             <div className="flex-1 relative">
               <input
                 type={showNotionKey ? "text" : "password"}
-                value={notionKeyInput}
-                onChange={(e) => {
-                  setNotionKeyInput(e.target.value);
-                  setNotionSaveStatus(null);
-                }}
+                value={notionApiKey}
+                onChange={(e) => setNotionApiKey(e.target.value)}
                 placeholder={hasNotionConfig ? "留空代表不變更..." : "貼上你的 Notion Integration Token..."}
                 className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent pr-10"
               />
@@ -338,11 +302,8 @@ export default function SettingsPage() {
           </label>
           <input
             type="text"
-            value={notionPageIdInput}
-            onChange={(e) => {
-              setNotionPageIdInput(e.target.value);
-              setNotionSaveStatus(null);
-            }}
+            value={notionParentPageId}
+            onChange={(e) => setNotionParentPageId(e.target.value)}
             placeholder="貼上 Notion 頁面 ID（32 位字串）..."
             className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
@@ -360,46 +321,9 @@ export default function SettingsPage() {
               onChange={(e) => setNotionEnabled(e.target.checked)}
               className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
             />
-            <span className="text-xs text-foreground">啟用自動同步</span>
+            <span className="text-xs text-foreground">啟用自動同步到 Notion</span>
           </label>
         </div>
-
-        {/* 儲存/清除按鈕 */}
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleNotionSave}
-            disabled={notionSaving}
-            className="px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {notionSaving ? "儲存中..." : "儲存設定"}
-          </button>
-          {hasNotionConfig && (
-            <button
-              onClick={handleNotionClear}
-              className="px-4 py-2 text-sm text-danger hover:bg-red-50 rounded-lg transition-colors"
-            >
-              清除設定
-            </button>
-          )}
-        </div>
-
-        {/* 儲存狀態顯示 */}
-        {notionSaveStatus === "success" && (
-          <div className="mt-3 flex items-center gap-2 text-success text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            Notion 設定已儲存！自動同步將在下次排程時間執行
-          </div>
-        )}
-        {notionSaveStatus === "fail" && (
-          <div className="mt-3 flex items-center gap-2 text-danger text-sm">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            儲存失敗，請確認 API Key 和 Page ID 是否正確
-          </div>
-        )}
 
         {/* 已設定提示 */}
         {hasNotionConfig && (
@@ -412,8 +336,82 @@ export default function SettingsPage() {
         )}
       </section>
 
+      {/* 排程設定 */}
+      <section className="bg-card border border-card-border rounded-xl p-6 mb-6">
+        <h3 className="text-sm font-semibold text-foreground mb-1">自動同步排程</h3>
+        <p className="text-xs text-muted mb-4">
+          設定你的個人化排程時間。系統會在指定時間自動執行分析並同步到 Notion。
+        </p>
+
+        {/* Cron 表達式 */}
+        <div className="mb-3">
+          <label className="text-xs font-medium text-foreground mb-1.5 block">
+            Cron 排程表達式
+          </label>
+          <input
+            type="text"
+            value={cronExpression}
+            onChange={(e) => setCronExpression(e.target.value)}
+            placeholder="0 9 * * *"
+            className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent font-mono"
+          />
+          <p className="text-xs text-muted mt-1">
+            範例：<code className="bg-gray-100 px-1 rounded">0 9 * * *</code> = 每天 9:00，
+            <code className="bg-gray-100 px-1 rounded mx-1">0 */6 * * *</code> = 每 6 小時
+          </p>
+        </div>
+
+        {/* 時區選擇 */}
+        <div className="mb-3">
+          <label className="text-xs font-medium text-foreground mb-1.5 block">時區</label>
+          <select
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent"
+          >
+            <option value="UTC">UTC</option>
+            <option value="Asia/Taipei">Asia/Taipei (台北)</option>
+            <option value="Asia/Hong_Kong">Asia/Hong_Kong (香港)</option>
+            <option value="Asia/Tokyo">Asia/Tokyo (東京)</option>
+            <option value="America/New_York">America/New_York (紐約)</option>
+            <option value="America/Los_Angeles">America/Los_Angeles (洛杉磯)</option>
+          </select>
+        </div>
+
+        {/* 啟用/停用 */}
+        <div className="mb-4">
+          <label className="flex items-center gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={scheduleEnabled}
+              onChange={(e) => setScheduleEnabled(e.target.checked)}
+              className="w-4 h-4 rounded border-gray-300 text-accent focus:ring-accent"
+            />
+            <span className="text-xs text-foreground">啟用自動排程</span>
+          </label>
+        </div>
+
+        {/* 排程資訊 */}
+        {hasScheduleConfig && (
+          <div className="bg-gray-50 rounded-lg p-3 space-y-1">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted">上次執行時間</span>
+              <span className="text-foreground font-mono">
+                {lastRunAt ? new Date(lastRunAt).toLocaleString("zh-TW") : "尚未執行"}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted">下次執行時間</span>
+              <span className="text-accent font-mono font-medium">
+                {nextRunAt ? new Date(nextRunAt).toLocaleString("zh-TW") : "計算中..."}
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+
       {/* 分析閾值 */}
-      <section className="bg-card border border-card-border rounded-xl p-6">
+      <section className="bg-card border border-card-border rounded-xl p-6 mb-6">
         <div className="flex items-center justify-between mb-1">
           <h3 className="text-sm font-semibold text-foreground">分析閾值設定</h3>
           {thresholdDirty && (
@@ -450,15 +448,8 @@ export default function SettingsPage() {
           ]} />
         </div>
 
-        {/* 儲存/重置按鈕 */}
+        {/* 重置按鈕 */}
         <div className="flex items-center gap-2 mt-6 pt-4 border-t border-card-border">
-          <button
-            onClick={handleSaveThresholds}
-            disabled={!thresholdDirty || thresholdSaving}
-            className="px-4 py-2 text-sm bg-accent text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {thresholdSaving ? "已儲存" : "儲存閾值"}
-          </button>
           <button
             onClick={handleResetThresholds}
             className="px-4 py-2 text-sm text-muted hover:text-foreground hover:bg-gray-100 rounded-lg transition-colors"
@@ -467,6 +458,42 @@ export default function SettingsPage() {
           </button>
         </div>
       </section>
+
+      {/* 統一儲存按鈕 */}
+      <div className="sticky bottom-6 bg-white border border-card-border rounded-xl p-4 shadow-lg">
+        <div className="flex items-center justify-between">
+          <div className="text-xs text-muted">
+            儲存所有設定（Windsor + Notion + 排程 + 閾值）
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleSaveAll}
+              disabled={saving}
+              className="px-6 py-2 text-sm bg-accent text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium"
+            >
+              {saving ? "儲存中..." : "儲存所有設定"}
+            </button>
+          </div>
+        </div>
+
+        {/* 儲存狀態 */}
+        {saveStatus === "success" && (
+          <div className="mt-3 flex items-center gap-2 text-success text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+            所有設定已儲存成功！
+          </div>
+        )}
+        {saveStatus === "fail" && (
+          <div className="mt-3 flex items-center gap-2 text-danger text-sm">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+            儲存失敗，請檢查設定是否正確
+          </div>
+        )}
+      </div>
     </div>
   );
 }

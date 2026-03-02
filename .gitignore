@@ -45,3 +45,5 @@ Thumbs.db
 
 # Claude
 .claude/
+
+/src/generated/prisma

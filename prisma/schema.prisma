@@ -1,0 +1,86 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== 使用者表 ====================
+model User {
+  id        String   @id @default(cuid())
+  clerkId   String   @unique
+  email     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  settings       UserSettings?
+  syncSchedules  SyncSchedule[]
+  syncLogs       SyncLog[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+// ==================== 使用者設定表 ====================
+model UserSettings {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  windsorApiKey      String?
+  notionApiKey       String?
+  notionParentPageId String?
+  notionEnabled      Boolean @default(true)
+  windsorDateRange   String  @default("last_7d")
+  thresholds         Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}
+
+// ==================== 同步排程表 ====================
+model SyncSchedule {
+  id             String    @id @default(cuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cronExpression String
+  timezone       String    @default("UTC")
+  enabled        Boolean   @default(true)
+  lastRunAt      DateTime?
+  nextRunAt      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([enabled])
+  @@index([nextRunAt])
+}
+
+// ==================== 同步記錄表 ====================
+model SyncLog {
+  id             String      @id @default(cuid())
+  userId         String
+  user           User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startedAt      DateTime    @default(now())
+  completedAt    DateTime?
+  status         SyncStatus
+  notionPageId   String?
+  errorMessage   String?
+  adsAnalyzed    Int?
+  alertsDetected Int?
+  overallRoas    Float?
+
+  @@index([userId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+enum SyncStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
