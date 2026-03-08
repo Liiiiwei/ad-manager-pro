@@ -12,9 +12,7 @@ export default function AccountFilter({ accounts, selected, onChange }: AccountF
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  if (accounts.length <= 1) return null;
-
-  // 點擊外部關閉下拉選單
+  // 點擊外部關閉下拉選單（必須在條件 return 之前呼叫）
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -24,6 +22,8 @@ export default function AccountFilter({ accounts, selected, onChange }: AccountF
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  if (accounts.length <= 1) return null;
 
   const handleToggle = (account: string) => {
     if (selected.includes(account)) {

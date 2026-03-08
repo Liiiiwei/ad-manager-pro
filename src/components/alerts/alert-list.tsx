@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback } from "react";
 import type { Alert, AlertCategory, AlertSeverity } from "@/lib/analysis/types";
 import AlertCard from "./alert-card";
 
@@ -27,12 +27,8 @@ function saveResolvedIds(ids: Set<string>) {
 export default function AlertList({ alerts }: AlertListProps) {
   const [categoryFilter, setCategoryFilter] = useState<AlertCategory | "all">("all");
   const [severityFilter, setSeverityFilter] = useState<AlertSeverity | "all">("all");
-  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
+  const [resolvedIds, setResolvedIds] = useState<Set<string>>(() => getResolvedIds());
   const [showResolved, setShowResolved] = useState(false);
-
-  useEffect(() => {
-    setResolvedIds(getResolvedIds());
-  }, []);
 
   const handleResolve = useCallback((id: string) => {
     setResolvedIds((prev) => {

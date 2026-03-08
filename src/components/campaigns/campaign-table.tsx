@@ -109,7 +109,7 @@ export default function CampaignTable({ data }: CampaignTableProps) {
   ];
 
   return (
-    <div className="bg-card border border-card-border rounded-xl overflow-hidden">
+    <div className="bg-card border border-card-border rounded-xl overflow-hidden animate-fade-in">
       {/* 篩選列 */}
       <div className="p-4 border-b border-card-border flex items-center gap-3">
         <span className="text-sm text-muted">平台：</span>

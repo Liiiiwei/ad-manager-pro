@@ -4,10 +4,23 @@ import { useState, useEffect, useCallback } from "react";
 import type { WindsorAdRecord } from "@/lib/windsor/types";
 import type { AnalysisResult } from "@/lib/analysis/types";
 
-/** 從 localStorage 取得 API Key */
+/** 從 localStorage 取得 API Key（僅限非 SSR 環境直接呼叫） */
 export function getApiKey(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem("windsor_api_key");
+}
+
+/** 用 hook 安全地讀取 API Key，避免 SSR hydration 不匹配 */
+export function useApiKey(): { apiKey: string | null; ready: boolean } {
+  const [apiKey, setApiKeyState] = useState<string | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    setApiKeyState(localStorage.getItem("windsor_api_key"));
+    setReady(true);
+  }, []);
+
+  return { apiKey, ready };
 }
 
 /** 儲存 API Key 到 localStorage */

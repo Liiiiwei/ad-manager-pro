@@ -22,14 +22,14 @@ export default function SpendChart({ data }: SpendChartProps) {
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-card border border-card-border rounded-xl p-5">
+      <div className="bg-card border border-card-border rounded-xl p-5 card-hover">
         <p className="text-sm text-muted">尚無資料</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-card border border-card-border rounded-xl p-5">
+    <div className="bg-card border border-card-border rounded-xl p-5 card-hover">
       <h3 className="text-sm font-semibold text-foreground mb-4">花費 vs 營收趨勢</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>

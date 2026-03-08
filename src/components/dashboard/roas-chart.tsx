@@ -23,14 +23,14 @@ export default function RoasChart({ data, roasThreshold = 1.5 }: RoasChartProps)
 
   if (chartData.length === 0) {
     return (
-      <div className="bg-card border border-card-border rounded-xl p-5">
+      <div className="bg-card border border-card-border rounded-xl p-5 card-hover">
         <p className="text-sm text-muted">尚無資料</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-card border border-card-border rounded-xl p-5">
+    <div className="bg-card border border-card-border rounded-xl p-5 card-hover">
       <h3 className="text-sm font-semibold text-foreground mb-4">每日 ROAS 與訂單數趨勢</h3>
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={chartData}>

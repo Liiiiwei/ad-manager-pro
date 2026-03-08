@@ -1,6 +1,6 @@
 "use client";
 
-import { useWindsorData, getApiKey } from "@/hooks/use-windsor-data";
+import { useWindsorData, useApiKey } from "@/hooks/use-windsor-data";
 import { useDateRange } from "@/hooks/use-date-range";
 import { usePlatformFilter } from "@/hooks/use-platform-filter";
 import Header from "@/components/layout/header";
@@ -11,12 +11,21 @@ import LoadingSpinner from "@/components/ui/loading-spinner";
 export default function CampaignsPage() {
   const { dateRange, setDateRange } = useDateRange();
   const { platform, setPlatform } = usePlatformFilter();
-  const apiKey = getApiKey();
+  const { apiKey, ready } = useApiKey();
+
+  if (!ready) {
+    return (
+      <>
+        <Header title="廣告活動" dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
+        <LoadingSpinner />
+      </>
+    );
+  }
 
   if (!apiKey) {
     return (
       <>
-        <Header dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
+        <Header title="廣告活動" dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
         <div className="flex-1 p-6">
           <EmptyState
             title="尚未設定 API Key"
@@ -31,7 +40,7 @@ export default function CampaignsPage() {
 
   return (
     <>
-      <Header dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
+      <Header title="廣告活動" dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
       <CampaignsContent dateRange={dateRange} platform={platform} />
     </>
   );
@@ -62,8 +71,7 @@ function CampaignsContent({
   }
 
   return (
-    <div className="flex-1 p-6">
-      <h2 className="text-lg font-semibold text-foreground mb-4">廣告活動</h2>
+    <div className="flex-1 p-4 sm:p-6 animate-fade-in">
       <CampaignTable data={data} />
     </div>
   );

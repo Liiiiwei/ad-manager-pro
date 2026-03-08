@@ -26,7 +26,7 @@ const nullableNumber = () =>
 
 /** 處理 website_purchase_roas 欄位（陣列或 null） */
 const roasField = () =>
-  z.any().optional().transform((v) => {
+  z.unknown().optional().transform((v) => {
     if (Array.isArray(v) && v.length > 0 && v[0]?.value) {
       const n = Number(v[0].value);
       return isNaN(n) ? 0 : n;
