@@ -64,14 +64,11 @@ function AlertsContent({
     return Array.from(names).sort();
   }, [alerts]);
 
-  // 初始化時選擇所有帳號
-  const effectiveFilter = accountFilter.length === 0 && accountNames.length > 0
-    ? accountNames
-    : accountFilter;
-
-  if (effectiveFilter !== accountFilter && effectiveFilter.length > 0 && accountFilter.length === 0) {
-    setAccountFilter(accountNames);
-  }
+  // 未選擇任何帳號時預設顯示全部
+  const effectiveFilter = useMemo(() => {
+    if (accountFilter.length === 0 && accountNames.length > 0) return accountNames;
+    return accountFilter;
+  }, [accountFilter, accountNames]);
 
   // 依帳號篩選警示
   const filteredAlerts = useMemo(() => {

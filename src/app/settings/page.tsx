@@ -59,8 +59,8 @@ export default function SettingsPage() {
       if (data.thresholds) {
         setThresholds(data.thresholds);
       }
-    } catch {
-      // API 不可用時靜默跳過
+    } catch (err) {
+      console.warn("設定載入失敗（API 可能不可用）:", err);
     }
   }
 
@@ -79,8 +79,8 @@ export default function SettingsPage() {
         setNextRunAt(data.nextRunAt);
         setLastRunAt(data.lastRunAt);
       }
-    } catch {
-      // API 不可用時靜默跳過
+    } catch (err) {
+      console.warn("排程載入失敗（API 可能不可用）:", err);
     }
   }
 

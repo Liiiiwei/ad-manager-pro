@@ -95,20 +95,21 @@ function DashboardContent({
     return Array.from(names).sort();
   }, [data]);
 
-  // 初始化時選擇所有帳號（使用同步 setState 取代 useEffect）
-  if (accountNames.length > 0 && accountFilter.length === 0) {
-    setAccountFilter(accountNames);
-  }
+  // 未選擇任何帳號時預設顯示全部
+  const effectiveFilter = useMemo(() => {
+    if (accountFilter.length === 0 && accountNames.length > 0) return accountNames;
+    return accountFilter;
+  }, [accountFilter, accountNames]);
 
   const filteredData = useMemo(() => {
-    if (accountFilter.length === 0 || accountFilter.length === accountNames.length) {
+    if (effectiveFilter.length === 0 || effectiveFilter.length === accountNames.length) {
       return data;
     }
-    return data.filter((d) => accountFilter.includes(d.account_name));
-  }, [data, accountFilter, accountNames.length]);
+    return data.filter((d) => effectiveFilter.includes(d.account_name));
+  }, [data, effectiveFilter, accountNames.length]);
 
   const filteredSummary = useMemo(() => {
-    if (accountFilter.length === 0 || accountFilter.length === accountNames.length) {
+    if (effectiveFilter.length === 0 || effectiveFilter.length === accountNames.length) {
       return result?.summary;
     }
     const totalSpend = filteredData.reduce((s, d) => s + d.spend, 0);
@@ -122,7 +123,7 @@ function DashboardContent({
       avgCpc: filteredData.length > 0 ? filteredData.reduce((s, d) => s + d.cpc, 0) / filteredData.length : 0,
       avgCtr: filteredData.length > 0 ? filteredData.reduce((s, d) => s + d.ctr, 0) / filteredData.length : 0,
     };
-  }, [accountFilter.length, accountNames.length, filteredData, result?.summary]);
+  }, [effectiveFilter.length, accountNames.length, filteredData, result?.summary]);
 
   if (loading) {
     return <LoadingSpinner message="正在載入廣告數據..." />;
@@ -142,7 +143,7 @@ function DashboardContent({
   return (
     <div className="flex-1 p-4 sm:p-6 space-y-6 animate-fade-in">
       {/* 帳號篩選器 */}
-      <AccountFilter accounts={accountNames} selected={accountFilter} onChange={setAccountFilter} />
+      <AccountFilter accounts={accountNames} selected={effectiveFilter} onChange={setAccountFilter} />
 
       {/* KPI 卡片 - 響應式 */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
