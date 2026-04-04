@@ -34,8 +34,10 @@ export default function RulesPage() {
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchRules = useCallback(async () => {
+    setError(null);
     try {
       const res = await fetch("/api/alerts/rules");
       if (!res.ok) throw new Error("載入失敗");
@@ -43,6 +45,7 @@ export default function RulesPage() {
       setRules(data);
     } catch (err) {
       console.error("載入規則失敗:", err);
+      setError("載入規則失敗，請重新整理頁面");
     } finally {
       setLoading(false);
     }
@@ -53,6 +56,7 @@ export default function RulesPage() {
   }, [fetchRules]);
 
   async function handleCreate(rule: AlertRuleInput) {
+    setError(null);
     setSubmitting(true);
     try {
       const res = await fetch("/api/alerts/rules", {
@@ -61,29 +65,34 @@ export default function RulesPage() {
         body: JSON.stringify(rule),
       });
       if (!res.ok) throw new Error("建立失敗");
-      const created = await res.json();
+      const { rule: created } = await res.json();
       setRules((prev) => [created, ...prev]);
       setShowForm(false);
     } catch (err) {
       console.error("建立規則失敗:", err);
+      setError("建立規則失敗，請再試一次");
     } finally {
       setSubmitting(false);
     }
   }
 
   async function handleToggle(rule: AlertRule) {
+    setError(null);
     setTogglingId(rule.id);
+    const { id, enabled } = rule;
     try {
       const res = await fetch("/api/alerts/rules", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: rule.id, enabled: !rule.enabled }),
+        body: JSON.stringify({ id, enabled: !enabled }),
       });
       if (!res.ok) throw new Error("更新失敗");
-      const updated = await res.json();
-      setRules((prev) => prev.map((r) => (r.id === rule.id ? updated : r)));
+      setRules((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, enabled: !enabled } : r)),
+      );
     } catch (err) {
       console.error("切換規則狀態失敗:", err);
+      setError("切換規則狀態失敗，請再試一次");
     } finally {
       setTogglingId(null);
     }
@@ -91,6 +100,7 @@ export default function RulesPage() {
 
   async function handleDelete(rule: AlertRule) {
     if (!confirm(`確定要刪除規則「${rule.name}」？`)) return;
+    setError(null);
     setDeletingId(rule.id);
     try {
       const res = await fetch(`/api/alerts/rules?id=${rule.id}`, {
@@ -100,6 +110,7 @@ export default function RulesPage() {
       setRules((prev) => prev.filter((r) => r.id !== rule.id));
     } catch (err) {
       console.error("刪除規則失敗:", err);
+      setError("刪除規則失敗，請再試一次");
     } finally {
       setDeletingId(null);
     }
@@ -122,6 +133,13 @@ export default function RulesPage() {
       <Header title="提醒規則管理" />
 
       <div className="flex-1 p-4 sm:p-6 space-y-4 animate-fade-in">
+        {/* 錯誤提示 */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-red-800 text-sm">{error}</p>
+          </div>
+        )}
+
         {/* 頂部操作列 */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">

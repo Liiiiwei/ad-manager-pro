@@ -1,5 +1,6 @@
 import type { WindsorAdRecord } from "@/lib/windsor/types";
 import type { TriggeredAlert, MetricKey, RuleCondition } from "./types";
+import { METRIC_LABELS } from "./types";
 import { average, percentChange } from "@/lib/utils/math";
 
 interface RuleRow {
@@ -169,16 +170,7 @@ function buildTitle(
   condition: RuleCondition,
   currentValue: number,
 ): string {
-  const metricLabels: Record<MetricKey, string> = {
-    spend: "花費",
-    roas: "ROAS",
-    cpc: "CPC",
-    cpm: "CPM",
-    ctr: "CTR",
-    conversions: "轉換數",
-    revenue: "營收",
-  };
-  return `${ruleName}：${metricLabels[metric]} 異常`;
+  return `${ruleName}：${METRIC_LABELS[metric]} 異常`;
 }
 
 function buildMessage(
@@ -189,20 +181,11 @@ function buildMessage(
   changePercent: number,
 ): string {
   const fmt = (v: number) => v.toFixed(2);
-  const metricLabels: Record<MetricKey, string> = {
-    spend: "花費",
-    roas: "ROAS",
-    cpc: "CPC",
-    cpm: "CPM",
-    ctr: "CTR",
-    conversions: "轉換數",
-    revenue: "營收",
-  };
-  const label = metricLabels[metric];
+  const label = METRIC_LABELS[metric];
 
   if (condition === "change_gt" || condition === "change_lt") {
     const dir = changePercent > 0 ? "上升" : "下降";
-    return `${label}從 ${fmt(previousValue)} ${dir}至 ${fmt(currentValue)}，變化 ${changePercent.toFixed(1)}%`;
+    return `${label}從 ${fmt(previousValue)} ${dir}至 ${fmt(currentValue)}，${dir === "下降" ? "跌幅" : "漲幅"} ${Math.abs(changePercent).toFixed(1)}%`;
   }
   return `${label}目前值 ${fmt(currentValue)}，已觸發規則門檻`;
 }

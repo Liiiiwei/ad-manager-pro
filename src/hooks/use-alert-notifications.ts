@@ -39,6 +39,7 @@ export function useAlertNotifications(pollIntervalMs = 5 * 60 * 1000) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const previousUnreadRef = useRef(0);
 
   // 啟動時請求通知權限
@@ -51,8 +52,12 @@ export function useAlertNotifications(pollIntervalMs = 5 * 60 * 1000) {
     setLoading(true);
     try {
       const res = await fetch("/api/alerts/notifications?limit=50");
-      if (!res.ok) return;
+      if (!res.ok) {
+        setError("無法載入通知");
+        return;
+      }
       const json = await res.json();
+      setError(null);
       setNotifications(json.notifications);
       setUnreadCount(json.unreadCount);
 
@@ -119,6 +124,7 @@ export function useAlertNotifications(pollIntervalMs = 5 * 60 * 1000) {
     notifications,
     unreadCount,
     loading,
+    error,
     markAsRead,
     markAllRead,
     triggerCheck,

@@ -38,20 +38,29 @@ export async function POST(req: NextRequest) {
     // 執行規則檢查
     const triggeredAlerts = checkRules(rules, data);
 
-    // 每日去重：同一規則當天只觸發一次
-    const today = new Date().toISOString().slice(0, 10);
+    // 每日去重：同一規則當天只觸發一次（以台北時區為基準）
+    const today = new Date().toLocaleDateString("sv", {
+      timeZone: "Asia/Taipei",
+    });
+    const startOfDay = new Date(`${today}T00:00:00+08:00`);
+    const ruleIds = triggeredAlerts.map((a) => a.ruleId);
     const newNotifications = [];
 
-    for (const alert of triggeredAlerts) {
-      const existing = await prisma.alertNotification.findFirst({
+    // 批次查詢今日已存在的通知，避免 N+1 問題
+    if (ruleIds.length > 0) {
+      const existingToday = await prisma.alertNotification.findMany({
         where: {
-          ruleId: alert.ruleId,
+          ruleId: { in: ruleIds },
           userId: user.id,
-          createdAt: { gte: new Date(`${today}T00:00:00Z`) },
+          createdAt: { gte: startOfDay },
         },
+        select: { ruleId: true },
       });
+      const existingRuleIds = new Set(existingToday.map((n) => n.ruleId));
 
-      if (!existing) {
+      for (const alert of triggeredAlerts) {
+        if (existingRuleIds.has(alert.ruleId)) continue;
+
         const notification = await prisma.alertNotification.create({
           data: {
             ruleId: alert.ruleId,
