@@ -1,11 +1,13 @@
-import { prisma } from '@/lib/db/prisma';
-import { SyncSchedule } from '@prisma/client';
-import parser from 'cron-parser';
+import { prisma } from "@/lib/db/prisma";
+import { SyncSchedule } from "@prisma/client";
+import { CronExpressionParser } from "cron-parser";
 
 /**
  * 取得使用者的排程設定
  */
-export async function getSyncSchedule(userId: string): Promise<SyncSchedule | null> {
+export async function getSyncSchedule(
+  userId: string,
+): Promise<SyncSchedule | null> {
   return await prisma.syncSchedule.findFirst({
     where: { userId },
   });
@@ -20,10 +22,13 @@ export async function upsertSyncSchedule(
     cronExpression: string;
     timezone?: string;
     enabled?: boolean;
-  }
+  },
 ): Promise<SyncSchedule> {
   // 計算下次執行時間
-  const nextRunAt = calculateNextRun(data.cronExpression, data.timezone || 'UTC');
+  const nextRunAt = calculateNextRun(
+    data.cronExpression,
+    data.timezone || "UTC",
+  );
 
   const existing = await getSyncSchedule(userId);
 
@@ -32,7 +37,7 @@ export async function upsertSyncSchedule(
       data: {
         userId,
         cronExpression: data.cronExpression,
-        timezone: data.timezone || 'UTC',
+        timezone: data.timezone || "UTC",
         enabled: data.enabled ?? true,
         nextRunAt,
       },
@@ -66,7 +71,7 @@ export async function getActiveSchedules() {
 export async function updateScheduleRunTime(
   scheduleId: string,
   lastRunAt: Date,
-  nextRunAt: Date
+  nextRunAt: Date,
 ): Promise<void> {
   await prisma.syncSchedule.update({
     where: { id: scheduleId },
@@ -79,13 +84,13 @@ export async function updateScheduleRunTime(
  */
 function calculateNextRun(cronExpression: string, timezone: string): Date {
   try {
-    const interval = parser.parseExpression(cronExpression, {
+    const interval = CronExpressionParser.parse(cronExpression, {
       currentDate: new Date(),
       tz: timezone,
     });
     return interval.next().toDate();
   } catch (error) {
-    console.error('無效的 Cron 表達式:', error);
+    console.error("無效的 Cron 表達式:", error);
     // 預設 24 小時後
     return new Date(Date.now() + 24 * 60 * 60 * 1000);
   }
