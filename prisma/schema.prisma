@@ -17,6 +17,8 @@ model User {
   settings       UserSettings?
   syncSchedules  SyncSchedule[]
   syncLogs       SyncLog[]
+  alertRules         AlertRule[]
+  alertNotifications AlertNotification[]
 
   @@index([clerkId])
   @@index([email])
@@ -76,6 +78,50 @@ model SyncLog {
   @@index([userId])
   @@index([status])
   @@index([startedAt])
+}
+
+// ==================== 異常提醒規則表 ====================
+model AlertRule {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name        String
+  metric      String   // spend, roas, cpc, cpm, ctr, conversions, revenue
+  condition   String   // gt (大於), lt (小於), change_gt (變化率大於), change_lt (變化率小於)
+  threshold   Float
+  platform    String   @default("all") // all, meta, google
+  campaignFilter String? // 可選：僅監控特定 campaign（模糊匹配）
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  notifications AlertNotification[]
+
+  @@index([userId])
+  @@index([enabled])
+}
+
+// ==================== 異常提醒通知表 ====================
+model AlertNotification {
+  id          String   @id @default(cuid())
+  ruleId      String
+  rule        AlertRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  message     String
+  metric      String
+  currentValue Float
+  previousValue Float
+  changePercent Float
+  severity    String   // critical, warning, info
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([ruleId])
+  @@index([read])
+  @@index([createdAt])
 }
 
 enum SyncStatus {
