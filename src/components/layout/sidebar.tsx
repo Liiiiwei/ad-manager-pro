@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 const navItems = [
   { href: "/dashboard", label: "儀表板", icon: "chart" },
   { href: "/campaigns", label: "廣告活動", icon: "megaphone" },
+  { href: "/ad-structure", label: "廣告架構", icon: "tree" },
   { href: "/alerts", label: "警示中心", icon: "bell" },
   { href: "/alerts/rules", label: "提醒規則", icon: "bellGear" },
   { href: "/settings", label: "設定", icon: "gear" },
@@ -78,6 +79,21 @@ const icons: Record<string, ReactNode> = {
         strokeLinejoin="round"
         strokeWidth={1.5}
         d="M18.5 5.5l1.5 1.5m0 0l-1.5 1.5M20 7h-3"
+      />
+    </svg>
+  ),
+  tree: (
+    <svg
+      className="w-5 h-5"
+      fill="none"
+      stroke="currentColor"
+      viewBox="0 0 24 24"
+    >
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth={1.5}
+        d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v0a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 6zm0 0h-1.5m13.5 6a2.25 2.25 0 012.25-2.25H20.25a2.25 2.25 0 012.25 2.25v0a2.25 2.25 0 01-2.25 2.25H18a2.25 2.25 0 01-2.25-2.25zm0 0h-5.25m0 0V6m0 6v6m0 0h5.25m-5.25 0a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25v0A2.25 2.25 0 016 15.75h2.25A2.25 2.25 0 0110.5 18z"
       />
     </svg>
   ),
