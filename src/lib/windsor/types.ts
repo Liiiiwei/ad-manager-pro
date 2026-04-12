@@ -55,6 +55,9 @@ const windsorRawSchema = z
     adset: nullableString(""),
     adset_name: nullableString(""),
     ad_name: nullableString(""),
+    campaign_status: nullableString(""),
+    adset_status: nullableString(""),
+    ad_status: nullableString(""),
     spend: nullableNumber(),
     impressions: nullableNumber(),
     clicks: nullableNumber(),
@@ -103,6 +106,10 @@ export interface WindsorAdRecord {
   leads: number;
   purchaseValue: number;
   addToCartValue: number;
+  // 投放狀態（ACTIVE / PAUSED / 其他）— 空字串代表未知
+  campaignStatus: string;
+  adsetStatus: string;
+  adStatus: string;
 }
 
 /** 將 Windsor 原始資料正規化為統一格式 */
@@ -143,6 +150,9 @@ export function normalizeRecord(
     leads: raw.actions_lead || 0,
     purchaseValue,
     addToCartValue: raw.action_values_add_to_cart || 0,
+    campaignStatus: (raw.campaign_status || "").toUpperCase(),
+    adsetStatus: (raw.adset_status || "").toUpperCase(),
+    adStatus: (raw.ad_status || "").toUpperCase(),
   };
 }
 

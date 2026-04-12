@@ -59,10 +59,10 @@ function getDefaultExpanded(trees: TreeNode[]): Set<string> {
   for (const tree of trees) {
     ids.add(tree.id);
   }
-  // 如果只有一個帳戶，也展開其下所有廣告活動
+  // 如果只有一個帳戶，也展開其下非暫停的廣告活動（已暫停卡片預設收合）
   if (trees.length === 1) {
     for (const campaign of trees[0].children) {
-      ids.add(campaign.id);
+      if (!campaign.isPausedGroup) ids.add(campaign.id);
     }
   }
   return ids;

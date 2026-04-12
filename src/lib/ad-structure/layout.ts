@@ -41,6 +41,7 @@ function collectVisible(
       childCount: tree.childCount,
       isExpanded,
       hasChildren,
+      isPausedGroup: tree.isPausedGroup ?? false,
     },
     width: size.width,
     height: size.height,

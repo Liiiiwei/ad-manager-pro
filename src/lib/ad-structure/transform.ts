@@ -1,11 +1,11 @@
 /**
  * 將 Windsor 廣告資料轉換為樹狀結構
- * 支援多天資料合併、指標向上聚合、警報計數
+ * 支援多天資料合併、指標向上聚合、警報計數、暫停節點聚合
  */
 
 import type { WindsorAdRecord } from "@/lib/windsor/types";
 import type { Alert } from "@/lib/analysis/types";
-import type { TreeNode, TreeNodeMetrics, NodeLevel } from "./types";
+import type { TreeNode, TreeNodeMetrics, NodeLevel, NodeStatus } from "./types";
 
 /** 計算花費加權平均值 */
 function weightedAvg(values: { value: number; weight: number }[]): number {
@@ -34,6 +34,53 @@ function aggregateMetrics(children: TreeNode[]): TreeNodeMetrics {
   return { spend, roas, ctr, cpc };
 }
 
+/** 正規化投放狀態字串 */
+function normalizeStatus(raw: string): NodeStatus {
+  const s = (raw || "").toUpperCase();
+  if (!s) return "UNKNOWN";
+  if (s === "ACTIVE" || s === "ENABLED") return "ACTIVE";
+  return "PAUSED";
+}
+
+/**
+ * 將同層子節點中「暫停」的節點聚合為單張「已暫停」卡片
+ * - 若沒有暫停節點，直接回傳 active/unknown 節點
+ * - 若有暫停節點，在尾端加入一張合成節點包住所有暫停子節點
+ */
+function groupPausedChildren(
+  children: TreeNode[],
+  parentId: string,
+  childLevel: NodeLevel,
+  platform: string,
+): TreeNode[] {
+  const visible: TreeNode[] = [];
+  const paused: TreeNode[] = [];
+  for (const c of children) {
+    if (c.status === "PAUSED") paused.push(c);
+    else visible.push(c);
+  }
+
+  if (paused.length === 0) return visible;
+
+  const pausedMetrics = aggregateMetrics(paused);
+  const pausedAlertCount = paused.reduce((s, n) => s + n.alertCount, 0);
+
+  const group: TreeNode = {
+    id: `${parentId}:::__paused__`,
+    label: `已暫停 (${paused.length})`,
+    level: childLevel,
+    platform,
+    metrics: pausedMetrics,
+    alertCount: pausedAlertCount,
+    childCount: paused.length,
+    children: paused,
+    status: "PAUSED",
+    isPausedGroup: true,
+  };
+
+  return [...visible, group];
+}
+
 /** 計算節點的警報數量 */
 function countAlerts(
   alerts: Alert[],
@@ -44,35 +91,23 @@ function countAlerts(
   adName?: string,
 ): number {
   return alerts.filter((a) => {
-    // 帳戶層級：匹配帳戶名稱
     if (a.accountName && a.accountName !== accountName) return false;
 
-    // 廣告活動層級
     if (level === "campaign" || level === "adset" || level === "ad") {
       if (a.campaignName && a.campaignName !== campaignName) return false;
     }
 
-    // 廣告組層級
     if (level === "adset" || level === "ad") {
       if (a.adsetName && a.adsetName !== adsetName) return false;
     }
 
-    // 廣告層級
     if (level === "ad") {
       if (a.adName && a.adName !== adName) return false;
     }
 
-    // 根據層級過濾：只匹配該層級或其子層級的警報
-    if (level === "ad") {
-      return !!a.adName;
-    }
-    if (level === "adset") {
-      return !!a.adsetName;
-    }
-    if (level === "campaign") {
-      return !!a.campaignName;
-    }
-    // 帳戶層級匹配所有帳戶相關警報
+    if (level === "ad") return !!a.adName;
+    if (level === "adset") return !!a.adsetName;
+    if (level === "campaign") return !!a.campaignName;
     return !!a.accountName;
   }).length;
 }
@@ -88,12 +123,12 @@ function nodeId(parts: string[]): string {
  * - 同名廣告的多天資料會合併（花費加總，指標用花費加權平均）
  * - 指標自下而上聚合
  * - 警報計數包含所有子節點
+ * - 每層中「暫停」的子節點會聚合為單張「已暫停 (N)」卡片
  */
 export function buildTree(
   records: WindsorAdRecord[],
   alerts: Alert[],
 ): TreeNode[] {
-  // 第一層分組：帳戶
   const accountMap = new Map<
     string,
     Map<string, Map<string, WindsorAdRecord[]>>
@@ -106,7 +141,6 @@ export function buildTree(
     const adsetName = r.adset || "未命名廣告組";
     const adName = r.ad_name || "未命名廣告";
 
-    // 記錄帳戶對應的平台
     if (!accountPlatform.has(accName)) {
       accountPlatform.set(accName, r.source);
     }
@@ -125,11 +159,9 @@ export function buildTree(
       adsetMap.set(adsetName, []);
     }
 
-    // 將記錄加入對應的廣告組，以 ad_name 為 key 稍後再合併
     adsetMap.get(adsetName)!.push({ ...r, ad_name: adName });
   }
 
-  // 建構樹
   const trees: TreeNode[] = [];
 
   for (const [accName, campMap] of accountMap) {
@@ -138,9 +170,13 @@ export function buildTree(
 
     for (const [campName, adsetMap] of campMap) {
       const adsetNodes: TreeNode[] = [];
+      let campStatusRaw = "";
 
       for (const [adsetName, adRecords] of adsetMap) {
-        // 合併同名廣告的多天資料
+        // 取得 adset/campaign 的 status（從任一筆記錄）
+        const adsetStatusRaw = adRecords[0]?.adsetStatus || "";
+        if (!campStatusRaw) campStatusRaw = adRecords[0]?.campaignStatus || "";
+
         const adMap = new Map<string, WindsorAdRecord[]>();
         for (const r of adRecords) {
           const name = r.ad_name || "未命名廣告";
@@ -150,7 +186,6 @@ export function buildTree(
 
         const adNodes: TreeNode[] = [];
         for (const [adName, dayRecords] of adMap) {
-          // 多天資料合併：花費加總，指標用花費加權平均
           const spend = dayRecords.reduce((s, r) => s + r.spend, 0);
           const roas = weightedAvg(
             dayRecords.map((r) => ({ value: r.roas, weight: r.spend })),
@@ -171,6 +206,8 @@ export function buildTree(
             adName,
           );
 
+          const adStatus = normalizeStatus(dayRecords[0]?.adStatus || "");
+
           adNodes.push({
             id: nodeId([accName, campName, adsetName, adName]),
             label: adName,
@@ -180,10 +217,18 @@ export function buildTree(
             alertCount: adAlertCount,
             childCount: 0,
             children: [],
+            status: adStatus,
           });
         }
 
-        // 廣告組指標 = 子廣告聚合
+        // 同層聚合暫停廣告
+        const groupedAds = groupPausedChildren(
+          adNodes,
+          nodeId([accName, campName, adsetName]),
+          "ad",
+          platform,
+        );
+
         const adsetMetrics = aggregateMetrics(adNodes);
         const adsetAlertCount =
           countAlerts(alerts, "adset", accName, campName, adsetName) +
@@ -197,11 +242,18 @@ export function buildTree(
           metrics: adsetMetrics,
           alertCount: adsetAlertCount,
           childCount: adNodes.length,
-          children: adNodes,
+          children: groupedAds,
+          status: normalizeStatus(adsetStatusRaw),
         });
       }
 
-      // 廣告活動指標 = 子廣告組聚合
+      const groupedAdsets = groupPausedChildren(
+        adsetNodes,
+        nodeId([accName, campName]),
+        "adset",
+        platform,
+      );
+
       const campMetrics = aggregateMetrics(adsetNodes);
       const campAlertCount =
         countAlerts(alerts, "campaign", accName, campName) +
@@ -215,11 +267,18 @@ export function buildTree(
         metrics: campMetrics,
         alertCount: campAlertCount,
         childCount: adsetNodes.length,
-        children: adsetNodes,
+        children: groupedAdsets,
+        status: normalizeStatus(campStatusRaw),
       });
     }
 
-    // 帳戶指標 = 子廣告活動聚合
+    const groupedCampaigns = groupPausedChildren(
+      campaignNodes,
+      nodeId([accName]),
+      "campaign",
+      platform,
+    );
+
     const accMetrics = aggregateMetrics(campaignNodes);
     const accAlertCount =
       countAlerts(alerts, "account", accName) +
@@ -233,7 +292,8 @@ export function buildTree(
       metrics: accMetrics,
       alertCount: accAlertCount,
       childCount: campaignNodes.length,
-      children: campaignNodes,
+      children: groupedCampaigns,
+      status: "ACTIVE",
     });
   }
 

@@ -10,6 +10,9 @@ export interface TreeNodeMetrics {
   cpc: number;
 }
 
+/** 投放狀態 */
+export type NodeStatus = "ACTIVE" | "PAUSED" | "UNKNOWN";
+
 /** 樹狀結構節點 */
 export interface TreeNode {
   id: string;
@@ -20,4 +23,8 @@ export interface TreeNode {
   alertCount: number;
   childCount: number;
   children: TreeNode[];
+  /** 投放狀態（ACTIVE 有投放；PAUSED 暫停；UNKNOWN 無資料） */
+  status: NodeStatus;
+  /** 是否為「已暫停」聚合卡（彙整多個暫停的同層子節點） */
+  isPausedGroup?: boolean;
 }

@@ -20,6 +20,7 @@ export interface AdStructureNodeData {
   childCount: number;
   isExpanded: boolean;
   hasChildren: boolean;
+  isPausedGroup?: boolean;
   onToggle?: (id: string) => void;
   onSelect?: (id: string) => void;
   [key: string]: unknown;
@@ -89,6 +90,7 @@ function AdStructureNodeComponent({ id, data }: NodeProps) {
     childCount,
     isExpanded,
     hasChildren,
+    isPausedGroup,
     onToggle,
     onSelect,
   } = data as AdStructureNodeData;
@@ -114,6 +116,7 @@ function AdStructureNodeComponent({ id, data }: NodeProps) {
         relative rounded-lg border-2 px-3 py-2 transition-all duration-200 cursor-pointer
         ${LEVEL_STYLES[level]}
         ${hasAlerts ? "!border-red-400" : ""}
+        ${isPausedGroup ? "!border-dashed !border-gray-400 !bg-gray-50 opacity-90" : ""}
       `}
       onClick={handleSelect}
     >
