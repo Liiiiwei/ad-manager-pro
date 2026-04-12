@@ -235,7 +235,7 @@ export function buildTree(
           adNodes.reduce((sum, n) => sum + n.alertCount, 0);
 
         const activeAdCount = adNodes.filter(
-          (n) => n.status === "ACTIVE",
+          (n) => n.status !== "PAUSED",
         ).length;
 
         adsetNodes.push({
@@ -264,16 +264,17 @@ export function buildTree(
         countAlerts(alerts, "campaign", accName, campName) +
         adsetNodes.reduce((sum, n) => sum + n.alertCount, 0);
 
+      // 非暫停（ACTIVE 或 UNKNOWN）即計入，避免連接器未回傳 status 時全為 0
       const activeAdsetCount = adsetNodes.filter(
-        (n) => n.status === "ACTIVE",
+        (n) => n.status !== "PAUSED",
       ).length;
       // 計算 campaign 下正在跑的不重複廣告素材名稱數（跨 adset 以 ad_name 去重）
       const activeAdNames = new Set<string>();
       for (const adsetNode of adsetNodes) {
-        if (adsetNode.status !== "ACTIVE") continue;
+        if (adsetNode.status === "PAUSED") continue;
         for (const adNode of adsetNode.children) {
           if (adNode.isPausedGroup) continue;
-          if (adNode.status === "ACTIVE") activeAdNames.add(adNode.label);
+          if (adNode.status !== "PAUSED") activeAdNames.add(adNode.label);
         }
       }
 
