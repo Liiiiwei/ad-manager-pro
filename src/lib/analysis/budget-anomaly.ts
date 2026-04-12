@@ -30,50 +30,6 @@ export function detectBudgetAnomalies(
 
     if (previousDays.length === 0) continue;
 
-    // 花費異常
-    const avgSpend = average(previousDays.map((r) => r.spend));
-    if (avgSpend > 0) {
-      const spendChange = percentChange(latest.spend, avgSpend);
-
-      if (spendChange > thresholds.overspendPercent) {
-        alerts.push({
-          id: generateId(),
-          category: "budget",
-          severity: spendChange > thresholds.overspendPercent * 2 ? "critical" : "warning",
-          title: `${campaignName} 花費超支`,
-          description: `今日花費 $${latest.spend.toFixed(2)} 超過 7 日平均 $${avgSpend.toFixed(2)} 達 ${spendChange.toFixed(1)}%`,
-          metric: "spend",
-          currentValue: latest.spend,
-          previousValue: avgSpend,
-          changePercent: spendChange,
-          platform,
-          accountName,
-          campaignName,
-          detectedAt: latest.date,
-          recommendation: "檢查預算設定是否正確，確認是否有出價異常",
-        });
-      }
-
-      if (spendChange < -thresholds.underspendPercent) {
-        alerts.push({
-          id: generateId(),
-          category: "budget",
-          severity: "warning",
-          title: `${campaignName} 花費不足`,
-          description: `今日花費 $${latest.spend.toFixed(2)} 低於 7 日平均 $${avgSpend.toFixed(2)} 達 ${Math.abs(spendChange).toFixed(1)}%`,
-          metric: "spend",
-          currentValue: latest.spend,
-          previousValue: avgSpend,
-          changePercent: spendChange,
-          platform,
-          accountName,
-          campaignName,
-          detectedAt: latest.date,
-          recommendation: "檢查廣告是否被暫停、預算是否耗盡、或受眾規模是否縮小",
-        });
-      }
-    }
-
     // CPC 暴漲
     const avgCpc = average(previousDays.map((r) => r.cpc));
     if (avgCpc > 0 && latest.cpc > 0) {
@@ -139,7 +95,8 @@ function groupByCampaign(
 }
 
 function toPlatform(source: string): "meta" | "google" | "all" {
-  if (source.includes("facebook") || source.includes("instagram")) return "meta";
+  if (source.includes("facebook") || source.includes("instagram"))
+    return "meta";
   if (source.includes("google")) return "google";
   return "all";
 }

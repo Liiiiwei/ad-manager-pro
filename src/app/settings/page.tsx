@@ -27,7 +27,8 @@ export default function SettingsPage() {
   const [lastRunAt, setLastRunAt] = useState<string | null>(null);
 
   // 閾值設定
-  const [thresholds, setThresholds] = useState<AnalysisThresholds>(DEFAULT_THRESHOLDS);
+  const [thresholds, setThresholds] =
+    useState<AnalysisThresholds>(DEFAULT_THRESHOLDS);
   const [thresholdDirty, setThresholdDirty] = useState(false);
 
   // UI 狀態
@@ -140,7 +141,9 @@ export default function SettingsPage() {
       }
 
       if (!serverSaveOk) {
-        console.warn("Server-side 設定儲存失敗（資料庫可能未連線），Windsor API Key 已存至本地");
+        console.warn(
+          "Server-side 設定儲存失敗（資料庫可能未連線），Windsor API Key 已存至本地",
+        );
       }
 
       setHasNotionConfig(true);
@@ -191,20 +194,37 @@ export default function SettingsPage() {
           description={
             <>
               輸入你的 Windsor.ai API Key 以連接廣告帳戶資料。可在{" "}
-              <a href="https://onboard.windsor.ai" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+              <a
+                href="https://onboard.windsor.ai"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-accent hover:underline"
+              >
                 Windsor.ai 後台
               </a>{" "}
               取得。
             </>
           }
           icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"
+              />
             </svg>
           }
         >
           <div className="mb-3">
-            <label className="text-xs font-medium text-foreground mb-1.5 block">API Key</label>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">
+              API Key
+            </label>
             <div className="relative">
               <input
                 type={showWindsorKey ? "text" : "password"}
@@ -213,13 +233,20 @@ export default function SettingsPage() {
                 placeholder="貼上你的 Windsor API Key..."
                 className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent pr-10 transition-shadow"
               />
-              <ToggleVisibility show={showWindsorKey} onToggle={() => setShowWindsorKey(!showWindsorKey)} />
+              <ToggleVisibility
+                show={showWindsorKey}
+                onToggle={() => setShowWindsorKey(!showWindsorKey)}
+              />
             </div>
-            <p className="text-[11px] text-muted mt-1">留空代表不變更現有設定</p>
+            <p className="text-[11px] text-muted mt-1">
+              留空代表不變更現有設定
+            </p>
           </div>
 
           <div>
-            <label className="text-xs font-medium text-foreground mb-1.5 block">日期範圍</label>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">
+              日期範圍
+            </label>
             <select
               value={windsorDateRange}
               onChange={(e) => setWindsorDateRange(e.target.value)}
@@ -237,20 +264,41 @@ export default function SettingsPage() {
           title="Notion 自動同步"
           description="設定自動每日同步廣告報告到 Notion。系統會根據排程時間自動產生報告並建立 Notion 頁面。"
           icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+              />
             </svg>
           }
-          badge={hasNotionConfig ? (notionEnabled ? "已啟用" : "已停用") : undefined}
-          badgeColor={notionEnabled ? "text-success bg-green-50" : "text-muted bg-gray-50"}
+          badge={
+            hasNotionConfig ? (notionEnabled ? "已啟用" : "已停用") : undefined
+          }
+          badgeColor={
+            notionEnabled ? "text-success bg-green-50" : "text-muted bg-gray-50"
+          }
         >
           {/* 設定步驟說明 */}
           <div className="bg-blue-50/70 border border-blue-100 rounded-lg p-3.5 mb-4">
-            <h4 className="text-xs font-semibold text-blue-800 mb-2">設定步驟</h4>
+            <h4 className="text-xs font-semibold text-blue-800 mb-2">
+              設定步驟
+            </h4>
             <ol className="text-xs text-blue-700 space-y-1.5 pl-4 list-decimal">
               <li>
                 前往{" "}
-                <a href="https://www.notion.so/my-integrations" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline font-medium">
+                <a
+                  href="https://www.notion.so/my-integrations"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-accent hover:underline font-medium"
+                >
                   Notion Integrations
                 </a>
                 ，建立 Integration 並複製 API Key
@@ -261,21 +309,32 @@ export default function SettingsPage() {
           </div>
 
           <div className="mb-3">
-            <label className="text-xs font-medium text-foreground mb-1.5 block">Notion API Key</label>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">
+              Notion API Key
+            </label>
             <div className="relative">
               <input
                 type={showNotionKey ? "text" : "password"}
                 value={notionApiKey}
                 onChange={(e) => setNotionApiKey(e.target.value)}
-                placeholder={hasNotionConfig ? "留空代表不變更..." : "貼上 Notion Integration Token..."}
+                placeholder={
+                  hasNotionConfig
+                    ? "留空代表不變更..."
+                    : "貼上 Notion Integration Token..."
+                }
                 className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent pr-10 transition-shadow"
               />
-              <ToggleVisibility show={showNotionKey} onToggle={() => setShowNotionKey(!showNotionKey)} />
+              <ToggleVisibility
+                show={showNotionKey}
+                onToggle={() => setShowNotionKey(!showNotionKey)}
+              />
             </div>
           </div>
 
           <div className="mb-3">
-            <label className="text-xs font-medium text-foreground mb-1.5 block">Notion Parent Page ID</label>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">
+              Notion Parent Page ID
+            </label>
             <input
               type="text"
               value={notionParentPageId}
@@ -283,7 +342,9 @@ export default function SettingsPage() {
               placeholder="貼上 Notion 頁面 ID（32 位字串）..."
               className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
             />
-            <p className="text-[11px] text-muted mt-1">從 Notion 頁面 URL 中取得的 32 位字串</p>
+            <p className="text-[11px] text-muted mt-1">
+              從 Notion 頁面 URL 中取得的 32 位字串
+            </p>
           </div>
 
           <ToggleField
@@ -298,13 +359,25 @@ export default function SettingsPage() {
           title="自動同步排程"
           description="設定個人化排程時間，系統會在指定時間自動執行分析並同步到 Notion。"
           icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
             </svg>
           }
         >
           <div className="mb-3">
-            <label className="text-xs font-medium text-foreground mb-1.5 block">Cron 排程表達式</label>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">
+              Cron 排程表達式
+            </label>
             <input
               type="text"
               value={cronExpression}
@@ -313,13 +386,21 @@ export default function SettingsPage() {
               className="w-full border border-card-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent font-mono transition-shadow"
             />
             <p className="text-[11px] text-muted mt-1">
-              <code className="bg-gray-100 px-1 rounded text-[10px]">0 9 * * *</code> = 每天 9:00 /
-              <code className="bg-gray-100 px-1 rounded text-[10px] ml-1">0 */6 * * *</code> = 每 6 小時
+              <code className="bg-gray-100 px-1 rounded text-[10px]">
+                0 9 * * *
+              </code>{" "}
+              = 每天 9:00 /
+              <code className="bg-gray-100 px-1 rounded text-[10px] ml-1">
+                0 */6 * * *
+              </code>{" "}
+              = 每 6 小時
             </p>
           </div>
 
           <div className="mb-3">
-            <label className="text-xs font-medium text-foreground mb-1.5 block">時區</label>
+            <label className="text-xs font-medium text-foreground mb-1.5 block">
+              時區
+            </label>
             <select
               value={timezone}
               onChange={(e) => setTimezone(e.target.value)}
@@ -330,7 +411,9 @@ export default function SettingsPage() {
               <option value="Asia/Hong_Kong">Asia/Hong_Kong (香港)</option>
               <option value="Asia/Tokyo">Asia/Tokyo (東京)</option>
               <option value="America/New_York">America/New_York (紐約)</option>
-              <option value="America/Los_Angeles">America/Los_Angeles (洛杉磯)</option>
+              <option value="America/Los_Angeles">
+                America/Los_Angeles (洛杉磯)
+              </option>
             </select>
           </div>
 
@@ -345,13 +428,17 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted">上次執行</span>
                 <span className="text-foreground font-mono text-[11px]">
-                  {lastRunAt ? new Date(lastRunAt).toLocaleString("zh-TW") : "尚未執行"}
+                  {lastRunAt
+                    ? new Date(lastRunAt).toLocaleString("zh-TW")
+                    : "尚未執行"}
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
                 <span className="text-muted">下次執行</span>
                 <span className="text-accent font-mono font-medium text-[11px]">
-                  {nextRunAt ? new Date(nextRunAt).toLocaleString("zh-TW") : "計算中..."}
+                  {nextRunAt
+                    ? new Date(nextRunAt).toLocaleString("zh-TW")
+                    : "計算中..."}
                 </span>
               </div>
             </div>
@@ -363,39 +450,147 @@ export default function SettingsPage() {
           title="分析閾值設定"
           description="調整各分析模組的偵測門檻，修改後點擊儲存生效"
           icon={
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
+              />
             </svg>
           }
           badge={thresholdDirty ? "未儲存" : undefined}
           badgeColor="text-amber-600 bg-amber-50"
         >
           <div className="space-y-4">
-            <ThresholdGroup title="預算異常" items={[
-              { label: "超支警告", value: thresholds.budget.overspendPercent, suffix: "%", desc: "日花費超過移動平均的百分比", onChange: (v) => updateThreshold("budget", "overspendPercent", v) },
-              { label: "欠支警告", value: thresholds.budget.underspendPercent, suffix: "%", desc: "日花費低於移動平均的百分比", onChange: (v) => updateThreshold("budget", "underspendPercent", v) },
-              { label: "CPC 暴漲", value: thresholds.budget.cpcSpikePercent, suffix: "%", desc: "CPC 超過移動平均的百分比", onChange: (v) => updateThreshold("budget", "cpcSpikePercent", v) },
-              { label: "CPM 暴漲", value: thresholds.budget.cpmSpikePercent, suffix: "%", desc: "CPM 超過移動平均的百分比", onChange: (v) => updateThreshold("budget", "cpmSpikePercent", v) },
-            ]} />
+            <ThresholdGroup
+              title="預算異常"
+              items={[
+                {
+                  label: "CPC 暴漲",
+                  value: thresholds.budget.cpcSpikePercent,
+                  suffix: "%",
+                  desc: "CPC 超過移動平均的百分比",
+                  onChange: (v) =>
+                    updateThreshold("budget", "cpcSpikePercent", v),
+                },
+                {
+                  label: "CPM 暴漲",
+                  value: thresholds.budget.cpmSpikePercent,
+                  suffix: "%",
+                  desc: "CPM 超過移動平均的百分比",
+                  onChange: (v) =>
+                    updateThreshold("budget", "cpmSpikePercent", v),
+                },
+              ]}
+            />
 
-            <ThresholdGroup title="成效下降" items={[
-              { label: "CTR 下降", value: thresholds.performance.ctrDropPercent, suffix: "%", desc: "CTR 下降超過此百分比", onChange: (v) => updateThreshold("performance", "ctrDropPercent", v) },
-              { label: "轉換率下降", value: thresholds.performance.convRateDropPercent, suffix: "%", desc: "轉換率下降超過此百分比", onChange: (v) => updateThreshold("performance", "convRateDropPercent", v) },
-              { label: "ROAS 下降", value: thresholds.performance.roasDropPercent, suffix: "%", desc: "ROAS 下降超過此百分比", onChange: (v) => updateThreshold("performance", "roasDropPercent", v) },
-              { label: "ROAS 虧損線", value: thresholds.performance.roasMinThreshold, suffix: "x", desc: "ROAS 低於此值視為虧損", step: 0.1, onChange: (v) => updateThreshold("performance", "roasMinThreshold", v) },
-            ]} />
+            <ThresholdGroup
+              title="成效下降"
+              items={[
+                {
+                  label: "CTR 下降",
+                  value: thresholds.performance.ctrDropPercent,
+                  suffix: "%",
+                  desc: "CTR 下降超過此百分比",
+                  onChange: (v) =>
+                    updateThreshold("performance", "ctrDropPercent", v),
+                },
+                {
+                  label: "轉換率下降",
+                  value: thresholds.performance.convRateDropPercent,
+                  suffix: "%",
+                  desc: "轉換率下降超過此百分比",
+                  onChange: (v) =>
+                    updateThreshold("performance", "convRateDropPercent", v),
+                },
+                {
+                  label: "ROAS 下降",
+                  value: thresholds.performance.roasDropPercent,
+                  suffix: "%",
+                  desc: "ROAS 下降超過此百分比",
+                  onChange: (v) =>
+                    updateThreshold("performance", "roasDropPercent", v),
+                },
+                {
+                  label: "ROAS 虧損線",
+                  value: thresholds.performance.roasMinThreshold,
+                  suffix: "x",
+                  desc: "ROAS 低於此值視為虧損",
+                  step: 0.1,
+                  onChange: (v) =>
+                    updateThreshold("performance", "roasMinThreshold", v),
+                },
+              ]}
+            />
 
-            <ThresholdGroup title="素材疲勞" items={[
-              { label: "高頻率門檻", value: thresholds.creative.highFrequency, suffix: "", desc: "頻率超過此值觸發警告", step: 0.5, onChange: (v) => updateThreshold("creative", "highFrequency", v) },
-              { label: "CTR 衰退", value: thresholds.creative.ctrDeclinePercent, suffix: "%", desc: "素材 CTR 下降百分比", onChange: (v) => updateThreshold("creative", "ctrDeclinePercent", v) },
-              { label: "觀察天數", value: thresholds.creative.fatigueWindowDays, suffix: " 天", desc: "用於判斷趨勢的天數", onChange: (v) => updateThreshold("creative", "fatigueWindowDays", v) },
-            ]} />
+            <ThresholdGroup
+              title="素材疲勞"
+              items={[
+                {
+                  label: "高頻率門檻",
+                  value: thresholds.creative.highFrequency,
+                  suffix: "",
+                  desc: "頻率超過此值觸發警告",
+                  step: 0.5,
+                  onChange: (v) =>
+                    updateThreshold("creative", "highFrequency", v),
+                },
+                {
+                  label: "CTR 衰退",
+                  value: thresholds.creative.ctrDeclinePercent,
+                  suffix: "%",
+                  desc: "素材 CTR 下降百分比",
+                  onChange: (v) =>
+                    updateThreshold("creative", "ctrDeclinePercent", v),
+                },
+                {
+                  label: "觀察天數",
+                  value: thresholds.creative.fatigueWindowDays,
+                  suffix: " 天",
+                  desc: "用於判斷趨勢的天數",
+                  onChange: (v) =>
+                    updateThreshold("creative", "fatigueWindowDays", v),
+                },
+              ]}
+            />
 
-            <ThresholdGroup title="擴量/停止建議" items={[
-              { label: "擴量門檻", value: thresholds.recommendation.scaleRoasMin, suffix: "x", desc: "ROAS 達此值建議擴量", step: 0.5, onChange: (v) => updateThreshold("recommendation", "scaleRoasMin", v) },
-              { label: "停止門檻", value: thresholds.recommendation.killRoasMax, suffix: "x", desc: "ROAS 低於此值建議停止", step: 0.1, onChange: (v) => updateThreshold("recommendation", "killRoasMax", v) },
-              { label: "最低花費", value: thresholds.recommendation.minSpendForDecision, suffix: "$", desc: "低於此花費不給建議", onChange: (v) => updateThreshold("recommendation", "minSpendForDecision", v) },
-            ]} />
+            <ThresholdGroup
+              title="擴量/停止建議"
+              items={[
+                {
+                  label: "擴量門檻",
+                  value: thresholds.recommendation.scaleRoasMin,
+                  suffix: "x",
+                  desc: "ROAS 達此值建議擴量",
+                  step: 0.5,
+                  onChange: (v) =>
+                    updateThreshold("recommendation", "scaleRoasMin", v),
+                },
+                {
+                  label: "停止門檻",
+                  value: thresholds.recommendation.killRoasMax,
+                  suffix: "x",
+                  desc: "ROAS 低於此值建議停止",
+                  step: 0.1,
+                  onChange: (v) =>
+                    updateThreshold("recommendation", "killRoasMax", v),
+                },
+                {
+                  label: "最低花費",
+                  value: thresholds.recommendation.minSpendForDecision,
+                  suffix: "$",
+                  desc: "低於此花費不給建議",
+                  onChange: (v) =>
+                    updateThreshold("recommendation", "minSpendForDecision", v),
+                },
+              ]}
+            />
           </div>
 
           <div className="flex items-center gap-2 mt-6 pt-4 border-t border-card-border">
@@ -411,22 +606,40 @@ export default function SettingsPage() {
         {/* 統一儲存按鈕 */}
         <div className="sticky bottom-4 sm:bottom-6 bg-card border border-card-border rounded-xl p-4 shadow-lg">
           <div className="flex items-center justify-between">
-            <div className="text-xs text-muted">
-              儲存所有設定
-            </div>
+            <div className="text-xs text-muted">儲存所有設定</div>
             <div className="flex items-center gap-3">
               {saveStatus === "success" && (
                 <span className="flex items-center gap-1.5 text-success text-sm font-medium animate-fade-in">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
                   </svg>
                   已儲存
                 </span>
               )}
               {saveStatus === "fail" && (
                 <span className="flex items-center gap-1.5 text-danger text-sm font-medium animate-fade-in">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
                   </svg>
                   儲存失敗
                 </span>
@@ -438,13 +651,30 @@ export default function SettingsPage() {
               >
                 {saving ? (
                   <span className="flex items-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    <svg
+                      className="w-4 h-4 animate-spin"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"
+                      />
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                      />
                     </svg>
                     儲存中
                   </span>
-                ) : "儲存所有設定"}
+                ) : (
+                  "儲存所有設定"
+                )}
               </button>
             </div>
           </div>
@@ -481,7 +711,9 @@ function SettingsSection({
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-semibold text-foreground">{title}</h3>
             {badge && (
-              <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}>
+              <span
+                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${badgeColor}`}
+              >
                 {badge}
               </span>
             )}
@@ -494,7 +726,13 @@ function SettingsSection({
   );
 }
 
-function ToggleVisibility({ show, onToggle }: { show: boolean; onToggle: () => void }) {
+function ToggleVisibility({
+  show,
+  onToggle,
+}: {
+  show: boolean;
+  onToggle: () => void;
+}) {
   return (
     <button
       type="button"
@@ -502,13 +740,33 @@ function ToggleVisibility({ show, onToggle }: { show: boolean; onToggle: () => v
       className="absolute right-2 top-1/2 -translate-y-1/2 text-muted hover:text-foreground transition-colors"
       title={show ? "隱藏" : "顯示"}
     >
-      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <svg
+        className="w-4 h-4"
+        fill="none"
+        stroke="currentColor"
+        viewBox="0 0 24 24"
+      >
         {show ? (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21" />
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"
+          />
         ) : (
           <>
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+            />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+            />
           </>
         )}
       </svg>
@@ -537,7 +795,9 @@ function ToggleField({
         <div className="w-9 h-5 bg-gray-200 rounded-full peer-checked:bg-accent transition-colors" />
         <div className="absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
       </div>
-      <span className="text-xs text-foreground group-hover:text-accent transition-colors">{label}</span>
+      <span className="text-xs text-foreground group-hover:text-accent transition-colors">
+        {label}
+      </span>
     </label>
   );
 }
@@ -565,7 +825,10 @@ function ThresholdGroup({
       </h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {items.map((item) => (
-          <div key={item.label} className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100/80 transition-colors">
+          <div
+            key={item.label}
+            className="bg-gray-50 rounded-lg p-3 hover:bg-gray-100/80 transition-colors"
+          >
             <div className="flex items-center justify-between mb-1">
               <span className="text-sm text-foreground">{item.label}</span>
               <div className="flex items-center gap-1">

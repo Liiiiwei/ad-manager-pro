@@ -3,8 +3,6 @@ import type { AnalysisThresholds } from "./types";
 /** 電商場景預設閾值 */
 export const DEFAULT_THRESHOLDS: AnalysisThresholds = {
   budget: {
-    overspendPercent: 20,
-    underspendPercent: 30,
     cpcSpikePercent: 50,
     cpmSpikePercent: 40,
   },

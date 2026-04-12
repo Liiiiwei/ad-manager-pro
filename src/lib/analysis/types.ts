@@ -55,8 +55,6 @@ export interface AnalysisResult {
 
 export interface AnalysisThresholds {
   budget: {
-    overspendPercent: number;
-    underspendPercent: number;
     cpcSpikePercent: number;
     cpmSpikePercent: number;
   };
