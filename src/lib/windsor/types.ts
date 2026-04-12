@@ -14,60 +14,69 @@ export interface WindsorQueryParams {
 
 /** 處理 null → 預設值的 helper */
 const nullableString = (fallback: string) =>
-  z.string().nullable().optional().transform((v) => v ?? fallback);
+  z
+    .string()
+    .nullable()
+    .optional()
+    .transform((v) => v ?? fallback);
 
 const nullableNumber = () =>
-  z.union([z.number(), z.string(), z.null(), z.undefined()])
-    .transform((v) => {
-      if (v === null || v === undefined || v === "") return 0;
-      const n = Number(v);
-      return isNaN(n) ? 0 : n;
-    });
+  z.union([z.number(), z.string(), z.null(), z.undefined()]).transform((v) => {
+    if (v === null || v === undefined || v === "") return 0;
+    const n = Number(v);
+    return isNaN(n) ? 0 : n;
+  });
 
 /** 處理 website_purchase_roas 欄位（陣列或 null） */
 const roasField = () =>
-  z.unknown().optional().transform((v) => {
-    if (Array.isArray(v) && v.length > 0 && v[0]?.value) {
-      const n = Number(v[0].value);
-      return isNaN(n) ? 0 : n;
-    }
-    if (typeof v === "number") return v;
-    if (typeof v === "string") {
-      const n = Number(v);
-      return isNaN(n) ? 0 : n;
-    }
-    return 0;
-  });
+  z
+    .unknown()
+    .optional()
+    .transform((v) => {
+      if (Array.isArray(v) && v.length > 0 && v[0]?.value) {
+        const n = Number(v[0].value);
+        return isNaN(n) ? 0 : n;
+      }
+      if (typeof v === "number") return v;
+      if (typeof v === "string") {
+        const n = Number(v);
+        return isNaN(n) ? 0 : n;
+      }
+      return 0;
+    });
 
 /** Windsor API 原始回應 schema（含 Meta 特有欄位） */
-const windsorRawSchema = z.object({
-  date: z.string(),
-  source: nullableString("unknown"),
-  account_name: nullableString(""),
-  campaign: nullableString(""),
-  adset: nullableString(""),
-  ad_name: nullableString(""),
-  spend: nullableNumber(),
-  impressions: nullableNumber(),
-  clicks: nullableNumber(),
-  frequency: nullableNumber(),
-  cpc: nullableNumber(),
-  cpm: nullableNumber(),
-  ctr: nullableNumber(),
-  // Meta 轉換欄位
-  actions_purchase: nullableNumber(),
-  actions_add_to_cart: nullableNumber(),
-  actions_initiate_checkout: nullableNumber(),
-  actions_lead: nullableNumber(),
-  actions_landing_page_view: nullableNumber(),
-  action_values_omni_purchase: nullableNumber(),
-  action_values_add_to_cart: nullableNumber(),
-  website_purchase_roas: roasField(),
-  // 通用欄位（部分 connector 可能有）
-  conversions: nullableNumber(),
-  revenue: nullableNumber(),
-  roas: nullableNumber(),
-}).passthrough();
+const windsorRawSchema = z
+  .object({
+    date: z.string(),
+    source: nullableString("unknown"),
+    account_name: nullableString(""),
+    campaign: nullableString(""),
+    adset: nullableString(""),
+    adset_name: nullableString(""),
+    ad_name: nullableString(""),
+    spend: nullableNumber(),
+    impressions: nullableNumber(),
+    clicks: nullableNumber(),
+    frequency: nullableNumber(),
+    cpc: nullableNumber(),
+    cpm: nullableNumber(),
+    ctr: nullableNumber(),
+    // Meta 轉換欄位
+    actions_purchase: nullableNumber(),
+    actions_add_to_cart: nullableNumber(),
+    actions_initiate_checkout: nullableNumber(),
+    actions_lead: nullableNumber(),
+    actions_landing_page_view: nullableNumber(),
+    action_values_omni_purchase: nullableNumber(),
+    action_values_add_to_cart: nullableNumber(),
+    website_purchase_roas: roasField(),
+    // 通用欄位（部分 connector 可能有）
+    conversions: nullableNumber(),
+    revenue: nullableNumber(),
+    roas: nullableNumber(),
+  })
+  .passthrough();
 
 /** 正規化後的統一廣告資料型別 */
 export interface WindsorAdRecord {
@@ -97,17 +106,24 @@ export interface WindsorAdRecord {
 }
 
 /** 將 Windsor 原始資料正規化為統一格式 */
-export function normalizeRecord(raw: z.infer<typeof windsorRawSchema>): WindsorAdRecord {
+export function normalizeRecord(
+  raw: z.infer<typeof windsorRawSchema>,
+): WindsorAdRecord {
   const purchases = raw.actions_purchase || 0;
   const purchaseValue = raw.action_values_omni_purchase || 0;
   const wpRoas = raw.website_purchase_roas || 0;
 
   return {
     date: raw.date,
-    source: raw.source,
+    // 將 IG/FB 統一視為 Meta 來源
+    source:
+      raw.source === "instagram" || raw.source === "facebook"
+        ? "meta"
+        : raw.source,
     account_name: raw.account_name,
     campaign: raw.campaign,
-    adset: raw.adset,
+    // adset_name 為 Windsor API 實際回傳欄位，adset 為備援
+    adset: raw.adset_name || raw.adset,
     ad_name: raw.ad_name,
     spend: raw.spend,
     impressions: raw.impressions,

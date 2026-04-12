@@ -7,6 +7,7 @@ const AD_PERFORMANCE_FIELDS = [
   "account_name",
   "campaign",
   "adset",
+  "adset_name",
   "ad_name",
   "spend",
   "impressions",

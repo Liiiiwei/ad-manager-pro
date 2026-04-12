@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import {
   useWindsorData,
   useApiKey,
@@ -79,11 +79,30 @@ function AdStructureContent({
 }) {
   const { data, loading, error } = useWindsorData(dateRange, platform);
   const { result: analysis } = useAnalysis(dateRange);
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
+    null,
+  );
 
   const trees = useMemo(() => {
     if (!data || data.length === 0) return [];
     return buildTree(data, analysis?.alerts ?? []);
   }, [data, analysis]);
+
+  // 當 trees 載入或改變時，自動選擇第一個帳號
+  useEffect(() => {
+    if (trees.length === 0) {
+      setSelectedAccountId(null);
+      return;
+    }
+    if (!selectedAccountId || !trees.find((t) => t.id === selectedAccountId)) {
+      setSelectedAccountId(trees[0].id);
+    }
+  }, [trees, selectedAccountId]);
+
+  const selectedTree = useMemo(
+    () => trees.find((t) => t.id === selectedAccountId) ?? null,
+    [trees, selectedAccountId],
+  );
 
   if (loading) {
     return <LoadingSpinner message="載入廣告架構中..." />;
@@ -113,10 +132,41 @@ function AdStructureContent({
 
   return (
     <div
-      className="flex-1 relative"
+      className="flex-1 relative flex flex-col"
       style={{ minHeight: "calc(100vh - 64px)" }}
     >
-      <AdStructureFlow trees={trees} alerts={analysis?.alerts ?? []} />
+      {/* 帳號 Tab */}
+      {trees.length > 1 && (
+        <div className="border-b border-gray-200 bg-white px-4 pt-2 overflow-x-auto">
+          <div className="flex gap-1">
+            {trees.map((tree) => {
+              const isActive = tree.id === selectedAccountId;
+              return (
+                <button
+                  key={tree.id}
+                  onClick={() => setSelectedAccountId(tree.id)}
+                  className={`px-4 py-2 text-sm font-medium rounded-t-lg transition-colors whitespace-nowrap ${
+                    isActive
+                      ? "bg-accent/10 text-accent border-b-2 border-accent"
+                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                  }`}
+                >
+                  {tree.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      <div className="flex-1 relative">
+        {selectedTree && (
+          <AdStructureFlow
+            trees={[selectedTree]}
+            alerts={analysis?.alerts ?? []}
+          />
+        )}
+      </div>
     </div>
   );
 }
