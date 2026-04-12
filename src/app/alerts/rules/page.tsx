@@ -40,9 +40,12 @@ export default function RulesPage() {
     setError(null);
     try {
       const res = await fetch("/api/alerts/rules");
-      if (!res.ok) throw new Error("載入失敗");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || `載入失敗 (${res.status})`);
+      }
       const data = await res.json();
-      setRules(data);
+      setRules(data.rules ?? []);
     } catch (err) {
       console.error("載入規則失敗:", err);
       setError("載入規則失敗，請重新整理頁面");

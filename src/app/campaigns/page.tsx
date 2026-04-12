@@ -1,7 +1,7 @@
 "use client";
 
 import { useWindsorData, useApiKey } from "@/hooks/use-windsor-data";
-import { useDateRange } from "@/hooks/use-date-range";
+import { useDateRange, resolveDatePreset } from "@/hooks/use-date-range";
 import { usePlatformFilter } from "@/hooks/use-platform-filter";
 import Header from "@/components/layout/header";
 import CampaignTable from "@/components/campaigns/campaign-table";
@@ -9,14 +9,24 @@ import EmptyState from "@/components/ui/empty-state";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 
 export default function CampaignsPage() {
-  const { dateRange, setDateRange } = useDateRange();
+  const { dateRange, setDateRange, includeToday, setIncludeToday } =
+    useDateRange();
   const { platform, setPlatform } = usePlatformFilter();
   const { apiKey, ready } = useApiKey();
+  const datePreset = resolveDatePreset(dateRange, includeToday);
 
   if (!ready) {
     return (
       <>
-        <Header title="廣告活動" dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
+        <Header
+          title="廣告活動"
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          includeToday={includeToday}
+          onIncludeTodayChange={setIncludeToday}
+          platform={platform}
+          onPlatformChange={setPlatform}
+        />
         <LoadingSpinner />
       </>
     );
@@ -25,7 +35,15 @@ export default function CampaignsPage() {
   if (!apiKey) {
     return (
       <>
-        <Header title="廣告活動" dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
+        <Header
+          title="廣告活動"
+          dateRange={dateRange}
+          onDateRangeChange={setDateRange}
+          includeToday={includeToday}
+          onIncludeTodayChange={setIncludeToday}
+          platform={platform}
+          onPlatformChange={setPlatform}
+        />
         <div className="flex-1 p-6">
           <EmptyState
             title="尚未設定 API Key"
@@ -40,8 +58,16 @@ export default function CampaignsPage() {
 
   return (
     <>
-      <Header title="廣告活動" dateRange={dateRange} onDateRangeChange={setDateRange} platform={platform} onPlatformChange={setPlatform} />
-      <CampaignsContent dateRange={dateRange} platform={platform} />
+      <Header
+        title="廣告活動"
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
+        includeToday={includeToday}
+        onIncludeTodayChange={setIncludeToday}
+        platform={platform}
+        onPlatformChange={setPlatform}
+      />
+      <CampaignsContent dateRange={datePreset} platform={platform} />
     </>
   );
 }

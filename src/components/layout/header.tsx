@@ -8,6 +8,8 @@ interface HeaderProps {
   title?: string;
   dateRange?: string;
   onDateRangeChange?: (value: string) => void;
+  includeToday?: boolean;
+  onIncludeTodayChange?: (value: boolean) => void;
   platform?: Platform;
   onPlatformChange?: (value: Platform) => void;
   accounts?: string[];
@@ -19,6 +21,8 @@ export default function Header({
   title,
   dateRange,
   onDateRangeChange,
+  includeToday,
+  onIncludeTodayChange,
   platform,
   onPlatformChange,
   accounts,
@@ -47,6 +51,19 @@ export default function Header({
             <option value="last_30d">最近 30 天</option>
             <option value="last_90d">最近 90 天</option>
           </select>
+        )}
+
+        {/* 包含今天 checkbox */}
+        {dateRange && onDateRangeChange && onIncludeTodayChange && (
+          <label className="flex items-center gap-1.5 text-sm text-foreground cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={!!includeToday}
+              onChange={(e) => onIncludeTodayChange(e.target.checked)}
+              className="w-4 h-4 rounded border-card-border accent-accent cursor-pointer"
+            />
+            包含今天
+          </label>
         )}
 
         {/* 帳號篩選器 */}

@@ -6,7 +6,7 @@ import {
   useApiKey,
   useAnalysis,
 } from "@/hooks/use-windsor-data";
-import { useDateRange } from "@/hooks/use-date-range";
+import { useDateRange, resolveDatePreset } from "@/hooks/use-date-range";
 import { usePlatformFilter } from "@/hooks/use-platform-filter";
 import Header from "@/components/layout/header";
 import EmptyState from "@/components/ui/empty-state";
@@ -15,9 +15,11 @@ import AdStructureFlow from "@/components/ad-structure/ad-structure-flow";
 import { buildTree } from "@/lib/ad-structure/transform";
 
 export default function AdStructurePage() {
-  const { dateRange, setDateRange } = useDateRange();
+  const { dateRange, setDateRange, includeToday, setIncludeToday } =
+    useDateRange();
   const { platform, setPlatform } = usePlatformFilter();
   const { apiKey, ready } = useApiKey();
+  const datePreset = resolveDatePreset(dateRange, includeToday);
 
   if (!ready) {
     return (
@@ -26,6 +28,8 @@ export default function AdStructurePage() {
           title="廣告架構"
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
+          includeToday={includeToday}
+          onIncludeTodayChange={setIncludeToday}
           platform={platform}
           onPlatformChange={setPlatform}
         />
@@ -41,6 +45,8 @@ export default function AdStructurePage() {
           title="廣告架構"
           dateRange={dateRange}
           onDateRangeChange={setDateRange}
+          includeToday={includeToday}
+          onIncludeTodayChange={setIncludeToday}
           platform={platform}
           onPlatformChange={setPlatform}
         />
@@ -62,10 +68,12 @@ export default function AdStructurePage() {
         title="廣告架構"
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
+        includeToday={includeToday}
+        onIncludeTodayChange={setIncludeToday}
         platform={platform}
         onPlatformChange={setPlatform}
       />
-      <AdStructureContent dateRange={dateRange} platform={platform} />
+      <AdStructureContent dateRange={datePreset} platform={platform} />
     </>
   );
 }
