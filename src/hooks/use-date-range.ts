@@ -14,7 +14,13 @@ export function resolveDatePreset(
   includeToday: boolean,
 ): string {
   if (!includeToday) return dateRange;
-  // Windsor 的「包含今天」變體
-  if (/^last_\d+d$/.test(dateRange)) return `${dateRange}_including_today`;
+  // Windsor 的「包含今天」變體：last_7d → last_7dT
+  if (/^last_\d+[dwmy]$/.test(dateRange)) return `${dateRange}T`;
+  if (dateRange === "last_year" || dateRange === "last_2years") {
+    return `${dateRange}T`;
+  }
+  if (dateRange === "this_month" || dateRange === "this_year") {
+    return `${dateRange}T`;
+  }
   return dateRange;
 }
