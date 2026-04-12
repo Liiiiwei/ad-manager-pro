@@ -27,4 +27,8 @@ export interface TreeNode {
   status: NodeStatus;
   /** 是否為「已暫停」聚合卡（彙整多個暫停的同層子節點） */
   isPausedGroup?: boolean;
+  /** 正在投放的直接子節點數（campaign/adset 用） */
+  activeChildCount?: number;
+  /** 正在投放的不重複廣告素材名稱數（campaign 用，跨 adset 以 ad_name 去重） */
+  activeAdCount?: number;
 }

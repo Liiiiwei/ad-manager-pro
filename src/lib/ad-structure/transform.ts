@@ -234,6 +234,10 @@ export function buildTree(
           countAlerts(alerts, "adset", accName, campName, adsetName) +
           adNodes.reduce((sum, n) => sum + n.alertCount, 0);
 
+        const activeAdCount = adNodes.filter(
+          (n) => n.status === "ACTIVE",
+        ).length;
+
         adsetNodes.push({
           id: nodeId([accName, campName, adsetName]),
           label: adsetName,
@@ -244,6 +248,7 @@ export function buildTree(
           childCount: adNodes.length,
           children: groupedAds,
           status: normalizeStatus(adsetStatusRaw),
+          activeChildCount: activeAdCount,
         });
       }
 
@@ -259,6 +264,19 @@ export function buildTree(
         countAlerts(alerts, "campaign", accName, campName) +
         adsetNodes.reduce((sum, n) => sum + n.alertCount, 0);
 
+      const activeAdsetCount = adsetNodes.filter(
+        (n) => n.status === "ACTIVE",
+      ).length;
+      // 計算 campaign 下正在跑的不重複廣告素材名稱數（跨 adset 以 ad_name 去重）
+      const activeAdNames = new Set<string>();
+      for (const adsetNode of adsetNodes) {
+        if (adsetNode.status !== "ACTIVE") continue;
+        for (const adNode of adsetNode.children) {
+          if (adNode.isPausedGroup) continue;
+          if (adNode.status === "ACTIVE") activeAdNames.add(adNode.label);
+        }
+      }
+
       campaignNodes.push({
         id: nodeId([accName, campName]),
         label: campName,
@@ -269,6 +287,8 @@ export function buildTree(
         childCount: adsetNodes.length,
         children: groupedAdsets,
         status: normalizeStatus(campStatusRaw),
+        activeChildCount: activeAdsetCount,
+        activeAdCount: activeAdNames.size,
       });
     }
 

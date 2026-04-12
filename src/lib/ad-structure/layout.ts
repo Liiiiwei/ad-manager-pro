@@ -42,6 +42,8 @@ function collectVisible(
       isExpanded,
       hasChildren,
       isPausedGroup: tree.isPausedGroup ?? false,
+      activeChildCount: tree.activeChildCount,
+      activeAdCount: tree.activeAdCount,
     },
     width: size.width,
     height: size.height,

@@ -55,15 +55,9 @@ function findNodeById(trees: TreeNode[], id: string): TreeNode | null {
 /** 計算預設展開的節點 ID */
 function getDefaultExpanded(trees: TreeNode[]): Set<string> {
   const ids = new Set<string>();
-  // 展開所有帳戶
+  // 每個帳號預設展開到行銷活動層（不再往下展開廣告組）
   for (const tree of trees) {
     ids.add(tree.id);
-  }
-  // 如果只有一個帳戶，也展開其下非暫停的廣告活動（已暫停卡片預設收合）
-  if (trees.length === 1) {
-    for (const campaign of trees[0].children) {
-      if (!campaign.isPausedGroup) ids.add(campaign.id);
-    }
   }
   return ids;
 }
@@ -171,6 +165,10 @@ export default function AdStructureFlow({
         maxZoom={2}
         nodesDraggable={false}
         nodesConnectable={false}
+        panOnScroll
+        panOnScrollSpeed={0.8}
+        zoomOnPinch
+        zoomOnScroll={false}
       >
         <Controls position="bottom-right" />
         <Background variant={BackgroundVariant.Dots} gap={20} color="#e2e8f0" />

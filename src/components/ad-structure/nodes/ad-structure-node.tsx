@@ -21,6 +21,8 @@ export interface AdStructureNodeData {
   isExpanded: boolean;
   hasChildren: boolean;
   isPausedGroup?: boolean;
+  activeChildCount?: number;
+  activeAdCount?: number;
   onToggle?: (id: string) => void;
   onSelect?: (id: string) => void;
   [key: string]: unknown;
@@ -91,6 +93,8 @@ function AdStructureNodeComponent({ id, data }: NodeProps) {
     isExpanded,
     hasChildren,
     isPausedGroup,
+    activeChildCount,
+    activeAdCount,
     onToggle,
     onSelect,
   } = data as AdStructureNodeData;
@@ -178,6 +182,25 @@ function AdStructureNodeComponent({ id, data }: NodeProps) {
       >
         {label}
       </p>
+
+      {/* 活躍計數（campaign 與 adset 顯示） */}
+      {!isPausedGroup && level === "campaign" && (
+        <div className="flex items-center gap-2 mb-1.5 text-[10px] text-gray-600">
+          <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded">
+            投放中廣告組 {activeChildCount ?? 0}
+          </span>
+          <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded">
+            素材 {activeAdCount ?? 0}
+          </span>
+        </div>
+      )}
+      {!isPausedGroup && level === "adset" && (
+        <div className="flex items-center gap-2 mb-1.5 text-[10px] text-gray-600">
+          <span className="px-1.5 py-0.5 bg-green-50 text-green-700 rounded">
+            投放中廣告 {activeChildCount ?? 0}
+          </span>
+        </div>
+      )}
 
       {/* 指標網格 */}
       <div className="grid grid-cols-4 gap-1 text-center">
