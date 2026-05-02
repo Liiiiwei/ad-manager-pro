@@ -56,7 +56,9 @@ export async function POST(req: NextRequest) {
         },
         select: { ruleId: true },
       });
-      const existingRuleIds = new Set(existingToday.map((n) => n.ruleId));
+      const existingRuleIds = new Set(
+        existingToday.map((n: { ruleId: string }) => n.ruleId),
+      );
 
       for (const alert of triggeredAlerts) {
         if (existingRuleIds.has(alert.ruleId)) continue;
@@ -86,7 +88,15 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("規則檢查失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "規則檢查失敗" },
+      {
+        error: "規則檢查失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }

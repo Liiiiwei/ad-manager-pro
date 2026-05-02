@@ -1,4 +1,4 @@
-import { Client } from "@notionhq/client";
+import { Client, type BlockObjectRequest } from "@notionhq/client";
 
 /**
  * 初始化 Notion Client
@@ -13,7 +13,7 @@ function initNotionClient(apiKey: string): Client {
  */
 function markdownToBlocks(markdown: string) {
   const lines = markdown.split("\n");
-  const blocks: any[] = [];
+  const blocks: BlockObjectRequest[] = [];
 
   let currentParagraph: string[] = [];
 
@@ -77,7 +77,7 @@ export async function createNotionPage(
   parentPageId: string,
   title: string,
   markdownContent: string,
-  notionApiKey: string
+  notionApiKey: string,
 ): Promise<string> {
   const notion = initNotionClient(notionApiKey);
 
@@ -103,12 +103,11 @@ export async function createNotionPage(
       children: blocks,
     });
 
-    console.log(`✅ Notion Page 建立成功: ${response.id}`);
     return response.id;
   } catch (error) {
-    console.error("❌ Notion API 錯誤:", error);
+    console.error("Notion API 錯誤:", error);
     throw new Error(
-      `無法建立 Notion Page: ${error instanceof Error ? error.message : String(error)}`
+      `無法建立 Notion Page: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 }

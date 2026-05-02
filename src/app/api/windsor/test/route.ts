@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/clerk";
 import { testApiKey } from "@/lib/windsor/client";
 
 export async function POST(request: NextRequest) {
+  const user = await getCurrentUser();
   try {
     const { apiKey } = await request.json();
 

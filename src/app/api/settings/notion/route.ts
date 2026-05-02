@@ -1,10 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getCurrentUser } from "@/lib/auth/clerk";
 import {
-  loadSettings,
-  updateSettings,
-  maskApiKey,
-  type NotionSettings,
-} from "@/lib/settings/storage";
+  getUserSettings,
+  updateUserSettings,
+} from "@/lib/db/repositories/user-settings";
+import { maskApiKey } from "@/lib/utils/format";
+import { encryptApiKey, decryptApiKey } from "@/lib/utils/crypto";
+
+/** POST 請求的 Zod 驗證 schema */
+const notionSettingsSchema = z.object({
+  apiKey: z.string().min(1, "Notion API Key 為必填欄位").max(500),
+  parentPageId: z.string().min(1, "Notion Parent Page ID 為必填欄位").max(500),
+  enabled: z.boolean().optional(),
+});
 
 /**
  * GET /api/settings/notion
@@ -12,14 +21,27 @@ import {
  */
 export async function GET() {
   try {
-    const settings = loadSettings();
-    const notionConfig = settings.notion || {};
+    const user = await getCurrentUser();
+    const settings = await getUserSettings(user.id);
+
+    if (!settings) {
+      return NextResponse.json({
+        configured: false,
+        apiKey: null,
+        parentPageId: null,
+        enabled: true,
+      });
+    }
+
+    const decryptedKey = settings.notionApiKey
+      ? decryptApiKey(settings.notionApiKey)
+      : null;
 
     return NextResponse.json({
-      configured: !!(notionConfig.apiKey && notionConfig.parentPageId),
-      apiKey: notionConfig.apiKey ? maskApiKey(notionConfig.apiKey) : null,
-      parentPageId: notionConfig.parentPageId || null,
-      enabled: notionConfig.enabled ?? true,
+      configured: !!(settings.notionApiKey && settings.notionParentPageId),
+      apiKey: decryptedKey ? maskApiKey(decryptedKey) : null,
+      parentPageId: settings.notionParentPageId || null,
+      enabled: settings.notionEnabled,
     });
   } catch (error) {
     console.error("讀取 Notion 設定失敗:", error);
@@ -33,36 +55,23 @@ export async function GET() {
  */
 export async function POST(request: NextRequest) {
   try {
+    const user = await getCurrentUser();
     const body = await request.json();
-    const { apiKey, parentPageId, enabled } = body as NotionSettings;
 
-    // 驗證必要欄位
-    if (!apiKey || !apiKey.trim()) {
-      return NextResponse.json(
-        { error: "Notion API Key 為必填欄位" },
-        { status: 400 }
-      );
+    // Zod 驗證
+    const parsed = notionSettingsSchema.safeParse(body);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0]?.message || "請求格式錯誤";
+      return NextResponse.json({ error: firstError }, { status: 400 });
     }
+    const { apiKey, parentPageId, enabled } = parsed.data;
 
-    if (!parentPageId || !parentPageId.trim()) {
-      return NextResponse.json(
-        { error: "Notion Parent Page ID 為必填欄位" },
-        { status: 400 }
-      );
-    }
-
-    // 儲存設定
-    const notionSettings: NotionSettings = {
-      apiKey: apiKey.trim(),
-      parentPageId: parentPageId.trim(),
-      enabled: enabled ?? true,
-    };
-
-    updateSettings({ notion: notionSettings });
-
-    console.log("✅ Notion 設定已更新");
-    console.log(`   Parent Page ID: ${notionSettings.parentPageId}`);
-    console.log(`   啟用狀態: ${notionSettings.enabled}`);
+    // 儲存設定到資料庫
+    await updateUserSettings(user.id, {
+      notionApiKey: encryptApiKey(apiKey.trim()),
+      notionParentPageId: parentPageId.trim(),
+      notionEnabled: enabled ?? true,
+    });
 
     return NextResponse.json({
       success: true,
@@ -76,7 +85,7 @@ export async function POST(request: NextRequest) {
         error: "儲存設定失敗",
         details: error instanceof Error ? error.message : String(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -87,15 +96,13 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE() {
   try {
-    updateSettings({
-      notion: {
-        apiKey: undefined,
-        parentPageId: undefined,
-        enabled: false,
-      },
-    });
+    const user = await getCurrentUser();
 
-    console.log("🗑️  Notion 設定已清除");
+    await updateUserSettings(user.id, {
+      notionApiKey: null,
+      notionParentPageId: null,
+      notionEnabled: false,
+    });
 
     return NextResponse.json({
       success: true,

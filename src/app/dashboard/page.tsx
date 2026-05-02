@@ -136,6 +136,8 @@ export default function DashboardPage() {
         title="儀表板"
         dateRange={dateRange}
         onDateRangeChange={setDateRange}
+        includeToday={includeToday}
+        onIncludeTodayChange={setIncludeToday}
         platform={platform}
         onPlatformChange={setPlatform}
       />
@@ -206,14 +208,26 @@ function DashboardContent({
       totalRevenue,
       overallRoas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
       totalConversions,
-      avgCpc:
-        filteredData.length > 0
-          ? filteredData.reduce((s, d) => s + d.cpc, 0) / filteredData.length
-          : 0,
-      avgCtr:
-        filteredData.length > 0
-          ? filteredData.reduce((s, d) => s + d.ctr, 0) / filteredData.length
-          : 0,
+      avgCpc: (() => {
+        const totalClicks = filteredData.reduce(
+          (s, d) => s + (d.clicks ?? 0),
+          0,
+        );
+        return totalClicks > 0 ? totalSpend / totalClicks : 0;
+      })(),
+      avgCtr: (() => {
+        const totalImpressions = filteredData.reduce(
+          (s, d) => s + (d.impressions ?? 0),
+          0,
+        );
+        const totalClicks = filteredData.reduce(
+          (s, d) => s + (d.clicks ?? 0),
+          0,
+        );
+        return totalImpressions > 0
+          ? (totalClicks / totalImpressions) * 100
+          : 0;
+      })(),
     };
   }, [
     effectiveFilter.length,

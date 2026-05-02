@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/clerk";
 import { syncToNotion } from "@/lib/cron/sync-notion";
 import { initCronJobs } from "@/lib/cron/scheduler";
 
@@ -11,24 +12,25 @@ initCronJobs();
  * POST /api/sync-notion
  */
 export async function POST() {
+  const user = await getCurrentUser();
   try {
     // 檢查必要的環境變數
     if (!process.env.WINDSOR_API_KEY) {
       return NextResponse.json(
         { error: "缺少環境變數: WINDSOR_API_KEY" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     if (!process.env.NOTION_API_KEY) {
       return NextResponse.json(
         { error: "缺少環境變數: NOTION_API_KEY" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     if (!process.env.NOTION_PARENT_PAGE_ID) {
       return NextResponse.json(
         { error: "缺少環境變數: NOTION_PARENT_PAGE_ID" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -45,9 +47,14 @@ export async function POST() {
     return NextResponse.json(
       {
         error: "同步失敗",
-        details: error instanceof Error ? error.message : String(error),
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -57,6 +64,7 @@ export async function POST() {
  * GET /api/sync-notion
  */
 export async function GET() {
+  const user = await getCurrentUser();
   const hasWindsorKey = !!process.env.WINDSOR_API_KEY;
   const hasNotionKey = !!process.env.NOTION_API_KEY;
   const hasParentPageId = !!process.env.NOTION_PARENT_PAGE_ID;

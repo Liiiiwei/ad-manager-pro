@@ -1,6 +1,6 @@
-import { NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth/clerk';
-import { getSyncHistory } from '@/lib/db/repositories/sync-log';
+import { NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/clerk";
+import { getSyncHistory } from "@/lib/db/repositories/sync-log";
 
 /**
  * GET /api/sync/history
@@ -25,10 +25,18 @@ export async function GET() {
       })),
     });
   } catch (error) {
-    console.error('讀取同步歷史失敗:', error);
+    console.error("讀取同步歷史失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '讀取同步歷史失敗' },
-      { status: 500 }
+      {
+        error: "讀取同步歷史失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
+      { status: 500 },
     );
   }
 }

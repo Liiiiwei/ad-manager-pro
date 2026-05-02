@@ -1,7 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/clerk";
 import { prisma } from "@/lib/db/prisma";
-import type { AlertRuleInput } from "@/lib/alerts/types";
+
+// 警報規則建立的 Zod 驗證 schema
+const ruleSchema = z.object({
+  name: z.string().min(1).max(200),
+  metric: z.enum([
+    "spend",
+    "roas",
+    "ctr",
+    "cpc",
+    "cpm",
+    "impressions",
+    "clicks",
+    "conversions",
+  ]),
+  condition: z.enum(["above", "below"]),
+  threshold: z.number().finite().nonnegative(),
+  platform: z.string().max(100).optional(),
+  campaignFilter: z.string().max(500).nullable().optional(),
+  enabled: z.boolean().optional(),
+});
 
 /**
  * GET /api/alerts/rules
@@ -20,7 +40,15 @@ export async function GET() {
   } catch (error) {
     console.error("讀取警報規則失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "讀取警報規則失敗" },
+      {
+        error: "讀取警報規則失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }
@@ -33,7 +61,21 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    const body: AlertRuleInput = await request.json();
+    const raw = await request.json();
+    const parsed = ruleSchema.safeParse(raw);
+    if (!parsed.success) {
+      return NextResponse.json(
+        {
+          error: "輸入驗證失敗",
+          details:
+            process.env.NODE_ENV === "production"
+              ? undefined
+              : parsed.error.flatten(),
+        },
+        { status: 400 },
+      );
+    }
+    const body = parsed.data;
 
     const rule = await prisma.alertRule.create({
       data: {
@@ -52,7 +94,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("建立警報規則失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "建立警報規則失敗" },
+      {
+        error: "建立警報規則失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }
@@ -65,15 +115,31 @@ export async function POST(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const user = await getCurrentUser();
-    const { id, ...updates } = await request.json();
+    const body = await request.json();
+    const { id } = body;
 
     if (!id) {
       return NextResponse.json({ error: "缺少規則 ID" }, { status: 400 });
     }
 
+    // 只允許更新特定欄位，防止 mass assignment 攻擊
+    const allowedFields = [
+      "name",
+      "metric",
+      "condition",
+      "threshold",
+      "platform",
+      "campaignFilter",
+      "enabled",
+    ];
+    const sanitizedUpdates: Record<string, unknown> = {};
+    for (const key of allowedFields) {
+      if (key in body) sanitizedUpdates[key] = body[key];
+    }
+
     const result = await prisma.alertRule.updateMany({
       where: { id, userId: user.id },
-      data: updates,
+      data: sanitizedUpdates,
     });
 
     if (result.count === 0) {
@@ -87,7 +153,15 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("更新警報規則失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "更新警報規則失敗" },
+      {
+        error: "更新警報規則失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }
@@ -122,7 +196,15 @@ export async function DELETE(request: NextRequest) {
   } catch (error) {
     console.error("刪除警報規則失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "刪除警報規則失敗" },
+      {
+        error: "刪除警報規則失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }

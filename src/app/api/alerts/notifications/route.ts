@@ -12,7 +12,11 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const unreadOnly = searchParams.get("unread") === "true";
-    const limit = parseInt(searchParams.get("limit") ?? "50", 10);
+    // 限制查詢筆數在 1~200 之間
+    const limit = Math.min(
+      Math.max(parseInt(searchParams.get("limit") ?? "50", 10), 1),
+      200,
+    );
 
     const where = {
       userId: user.id,
@@ -39,7 +43,15 @@ export async function GET(req: NextRequest) {
   } catch (error) {
     console.error("讀取通知失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "讀取通知失敗" },
+      {
+        error: "讀取通知失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }
@@ -77,7 +89,15 @@ export async function PATCH(req: NextRequest) {
   } catch (error) {
     console.error("更新通知失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "更新通知失敗" },
+      {
+        error: "更新通知失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }

@@ -28,3 +28,9 @@ export function formatRoas(value: number): string {
 export function formatCtr(value: number): string {
   return `${value.toFixed(2)}%`;
 }
+
+/** 遮罩 API Key（用於前端顯示） */
+export function maskApiKey(apiKey: string): string {
+  if (apiKey.length <= 10) return "***";
+  return `${apiKey.slice(0, 7)}***...***${apiKey.slice(-3)}`;
+}

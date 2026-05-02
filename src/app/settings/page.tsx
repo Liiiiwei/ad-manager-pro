@@ -33,57 +33,59 @@ export default function SettingsPage() {
 
   // UI 狀態
   const [saving, setSaving] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<"success" | "fail" | null>(null);
+  const [saveStatus, setSaveStatus] = useState<
+    "success" | "partial" | "fail" | null
+  >(null);
 
   useEffect(() => {
+    async function loadSettings() {
+      try {
+        const res = await fetch("/api/settings");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.error) return;
+
+        if (data.windsor) {
+          setWindsorDateRange(data.windsor.dateRange || "last_7d");
+        }
+
+        if (data.notion) {
+          setHasNotionConfig(data.notion.configured);
+          setNotionParentPageId(data.notion.parentPageId || "");
+          setNotionEnabled(data.notion.enabled ?? true);
+        }
+
+        if (data.thresholds) {
+          setThresholds(data.thresholds);
+        }
+      } catch (err) {
+        console.warn("設定載入失敗（API 可能不可用）:", err);
+      }
+    }
+
+    async function loadSchedule() {
+      try {
+        const res = await fetch("/api/settings/schedule");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.error) return;
+
+        if (data.configured) {
+          setHasScheduleConfig(true);
+          setCronExpression(data.cronExpression || "0 9 * * *");
+          setTimezone(data.timezone || "Asia/Taipei");
+          setScheduleEnabled(data.enabled ?? true);
+          setNextRunAt(data.nextRunAt);
+          setLastRunAt(data.lastRunAt);
+        }
+      } catch (err) {
+        console.warn("排程載入失敗（API 可能不可用）:", err);
+      }
+    }
+
     loadSettings();
     loadSchedule();
   }, []);
-
-  async function loadSettings() {
-    try {
-      const res = await fetch("/api/settings");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.error) return;
-
-      if (data.windsor) {
-        setWindsorDateRange(data.windsor.dateRange || "last_7d");
-      }
-
-      if (data.notion) {
-        setHasNotionConfig(data.notion.configured);
-        setNotionParentPageId(data.notion.parentPageId || "");
-        setNotionEnabled(data.notion.enabled ?? true);
-      }
-
-      if (data.thresholds) {
-        setThresholds(data.thresholds);
-      }
-    } catch (err) {
-      console.warn("設定載入失敗（API 可能不可用）:", err);
-    }
-  }
-
-  async function loadSchedule() {
-    try {
-      const res = await fetch("/api/settings/schedule");
-      if (!res.ok) return;
-      const data = await res.json();
-      if (data.error) return;
-
-      if (data.configured) {
-        setHasScheduleConfig(true);
-        setCronExpression(data.cronExpression || "0 9 * * *");
-        setTimezone(data.timezone || "Asia/Taipei");
-        setScheduleEnabled(data.enabled ?? true);
-        setNextRunAt(data.nextRunAt);
-        setLastRunAt(data.lastRunAt);
-      }
-    } catch (err) {
-      console.warn("排程載入失敗（API 可能不可用）:", err);
-    }
-  }
 
   async function handleSaveAll() {
     setSaving(true);
@@ -148,7 +150,7 @@ export default function SettingsPage() {
 
       setHasNotionConfig(true);
       setThresholdDirty(false);
-      setSaveStatus("success");
+      setSaveStatus(serverSaveOk ? "success" : "partial");
 
       setWindsorApiKey("");
       setNotionApiKey("");
@@ -624,6 +626,24 @@ export default function SettingsPage() {
                     />
                   </svg>
                   已儲存
+                </span>
+              )}
+              {saveStatus === "partial" && (
+                <span className="flex items-center gap-1.5 text-warning text-sm font-medium animate-fade-in">
+                  <svg
+                    className="w-4 h-4"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+                    />
+                  </svg>
+                  本地設定已儲存，但伺服器同步失敗
                 </span>
               )}
               {saveStatus === "fail" && (

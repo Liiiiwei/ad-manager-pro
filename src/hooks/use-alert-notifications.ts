@@ -74,42 +74,83 @@ export function useAlertNotifications(pollIntervalMs = 5 * 60 * 1000) {
     }
   }, []);
 
-  // 觸發規則檢查
+  // 觸發規則檢查（背景操作，靜默處理錯誤）
   const triggerCheck = useCallback(async () => {
-    const apiKey = getApiKey();
-    if (!apiKey) return;
+    try {
+      const apiKey = getApiKey();
+      if (!apiKey) return;
 
-    await fetch("/api/alerts/check", {
-      method: "POST",
-      headers: { "x-windsor-api-key": apiKey },
-    });
-    // 檢查完後重新取得通知
-    await fetchNotifications();
+      await fetch("/api/alerts/check", {
+        method: "POST",
+        headers: { "x-windsor-api-key": apiKey },
+      });
+      // 檢查完後重新取得通知
+      await fetchNotifications();
+    } catch {
+      // 背景操作，靜默處理錯誤
+    }
   }, [fetchNotifications]);
 
-  // 標記已讀
-  const markAsRead = useCallback(async (id: string) => {
-    await fetch("/api/alerts/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id }),
-    });
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-    );
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-  }, []);
+  // 標記已讀（含樂觀更新與失敗回滾）
+  const markAsRead = useCallback(
+    async (id: string) => {
+      // 保留原始狀態以便回滾
+      const prevNotifications = notifications;
+      const prevUnreadCount = unreadCount;
 
-  // 全部標記已讀
+      // 樂觀更新
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
+      );
+      setUnreadCount((prev) => Math.max(0, prev - 1));
+
+      try {
+        const response = await fetch("/api/alerts/notifications", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
+        if (!response.ok) {
+          // 伺服器回應失敗，回滾樂觀更新
+          setNotifications(prevNotifications);
+          setUnreadCount(prevUnreadCount);
+        }
+      } catch {
+        // 請求失敗，回滾樂觀更新
+        setNotifications(prevNotifications);
+        setUnreadCount(prevUnreadCount);
+      }
+    },
+    [notifications, unreadCount],
+  );
+
+  // 全部標記已讀（含樂觀更新與失敗回滾）
   const markAllRead = useCallback(async () => {
-    await fetch("/api/alerts/notifications", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ markAllRead: true }),
-    });
+    // 保留原始狀態以便回滾
+    const prevNotifications = notifications;
+    const prevUnreadCount = unreadCount;
+
+    // 樂觀更新
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
-  }, []);
+
+    try {
+      const response = await fetch("/api/alerts/notifications", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ markAllRead: true }),
+      });
+      if (!response.ok) {
+        // 伺服器回應失敗，回滾樂觀更新
+        setNotifications(prevNotifications);
+        setUnreadCount(prevUnreadCount);
+      }
+    } catch {
+      // 請求失敗，回滾樂觀更新
+      setNotifications(prevNotifications);
+      setUnreadCount(prevUnreadCount);
+    }
+  }, [notifications, unreadCount]);
 
   // 初次載入 + 定時輪詢
   useEffect(() => {

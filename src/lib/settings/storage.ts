@@ -1,5 +1,11 @@
+/**
+ * @deprecated 此模組使用檔案系統儲存，已改為資料庫儲存。
+ * 請改用 @/lib/db/repositories/user-settings。
+ * 保留此檔案是為了向後相容，未來版本將移除。
+ */
 import fs from "fs";
 import path from "path";
+import { maskApiKey } from "@/lib/utils/format";
 
 const SETTINGS_DIR = path.join(process.cwd(), ".data");
 const SETTINGS_FILE = path.join(SETTINGS_DIR, "settings.json");
@@ -66,8 +72,12 @@ export function saveSettings(settings: AppSettings): void {
       updatedAt: new Date().toISOString(),
     };
 
-    fs.writeFileSync(SETTINGS_FILE, JSON.stringify(updatedSettings, null, 2), "utf-8");
-    console.log("✅ 設定已儲存至", SETTINGS_FILE);
+    fs.writeFileSync(
+      SETTINGS_FILE,
+      JSON.stringify(updatedSettings, null, 2),
+      "utf-8",
+    );
+    // 設定已儲存
   } catch (error) {
     console.error("儲存設定失敗:", error);
     throw new Error("無法儲存設定");
@@ -125,14 +135,5 @@ export function getCronConfig(): {
   };
 }
 
-/**
- * 遮罩 API Key（用於前端顯示）
- */
-export function maskApiKey(apiKey: string): string {
-  if (apiKey.length <= 10) {
-    return "***";
-  }
-  const start = apiKey.slice(0, 7);
-  const end = apiKey.slice(-3);
-  return `${start}***...***${end}`;
-}
+// maskApiKey 已移至 @/lib/utils/format，此處重新匯出以保持向後相容
+export { maskApiKey };

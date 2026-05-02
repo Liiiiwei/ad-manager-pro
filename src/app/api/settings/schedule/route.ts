@@ -1,6 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth/clerk';
-import { getSyncSchedule, upsertSyncSchedule } from '@/lib/db/repositories/sync-schedule';
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getCurrentUser } from "@/lib/auth/clerk";
+import {
+  getSyncSchedule,
+  upsertSyncSchedule,
+} from "@/lib/db/repositories/sync-schedule";
+
+/** POST 請求的 Zod 驗證 schema */
+const scheduleSchema = z.object({
+  cronExpression: z
+    .string()
+    .regex(
+      /^(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)\s+(\*|[0-9,\-\/]+)$/,
+      "無效的 Cron 表達式",
+    ),
+  timezone: z.string().max(50).optional(),
+  enabled: z.boolean().optional(),
+});
 
 /**
  * GET /api/settings/schedule
@@ -14,8 +30,8 @@ export async function GET() {
     if (!schedule) {
       return NextResponse.json({
         configured: false,
-        cronExpression: '0 9 * * *',
-        timezone: 'UTC',
+        cronExpression: "0 9 * * *",
+        timezone: "UTC",
         enabled: true,
         lastRunAt: null,
         nextRunAt: null,
@@ -31,10 +47,10 @@ export async function GET() {
       nextRunAt: schedule.nextRunAt,
     });
   } catch (error) {
-    console.error('讀取排程失敗:', error);
+    console.error("讀取排程失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '讀取排程失敗' },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "讀取排程失敗" },
+      { status: 500 },
     );
   }
 }
@@ -48,25 +64,23 @@ export async function POST(request: NextRequest) {
     const user = await getCurrentUser();
     const body = await request.json();
 
-    const { cronExpression, timezone, enabled } = body;
-
-    // 驗證 Cron 表達式
-    if (!cronExpression || typeof cronExpression !== 'string') {
-      return NextResponse.json(
-        { error: 'Cron 表達式為必填欄位' },
-        { status: 400 }
-      );
+    // Zod 驗證
+    const parsed = scheduleSchema.safeParse(body);
+    if (!parsed.success) {
+      const firstError = parsed.error.errors[0]?.message || "請求格式錯誤";
+      return NextResponse.json({ error: firstError }, { status: 400 });
     }
+    const { cronExpression, timezone, enabled } = parsed.data;
 
     const schedule = await upsertSyncSchedule(user.id, {
       cronExpression,
-      timezone: timezone || 'UTC',
+      timezone: timezone || "UTC",
       enabled: enabled ?? true,
     });
 
     return NextResponse.json({
       success: true,
-      message: '排程設定已儲存',
+      message: "排程設定已儲存",
       schedule: {
         cronExpression: schedule.cronExpression,
         timezone: schedule.timezone,
@@ -75,10 +89,10 @@ export async function POST(request: NextRequest) {
       },
     });
   } catch (error) {
-    console.error('儲存排程失敗:', error);
+    console.error("儲存排程失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '儲存排程失敗' },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "儲存排程失敗" },
+      { status: 500 },
     );
   }
 }

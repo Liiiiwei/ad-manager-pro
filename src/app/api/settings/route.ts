@@ -1,11 +1,42 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getCurrentUser } from '@/lib/auth/clerk';
-import { getUserSettings, updateUserSettings } from '@/lib/db/repositories/user-settings';
-
-function maskApiKey(apiKey: string): string {
-  if (apiKey.length <= 10) return '***';
-  return `${apiKey.slice(0, 7)}***...***${apiKey.slice(-3)}`;
+import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
+import { getCurrentUser } from "@/lib/auth/clerk";
+import {
+  getUserSettings,
+  updateUserSettings,
+} from "@/lib/db/repositories/user-settings";
+import { maskApiKey } from "@/lib/utils/format";
+import { encryptApiKey, decryptApiKey } from "@/lib/utils/crypto";
+/** 設定更新資料型別 */
+interface SettingsUpdateData {
+  windsorApiKey?: string | null;
+  windsorDateRange?: string;
+  notionApiKey?: string | null;
+  notionParentPageId?: string | null;
+  notionEnabled?: boolean;
+  thresholds?: Record<string, number>;
 }
+
+/** PATCH 請求的 Zod 驗證 schema */
+const settingsSchema = z
+  .object({
+    windsor: z
+      .object({
+        apiKey: z.string().max(500).optional(),
+        dateRange: z.string().max(50).optional(),
+      })
+      .optional(),
+    notion: z
+      .object({
+        apiKey: z.string().max(500).optional(),
+        parentPageId: z.string().max(500).optional(),
+        enabled: z.boolean().optional(),
+      })
+      .optional(),
+    thresholds: z.record(z.number().finite()).optional(),
+    dashboardVisibility: z.record(z.boolean()).optional(),
+  })
+  .strict();
 
 /**
  * GET /api/settings
@@ -18,7 +49,7 @@ export async function GET() {
 
     if (!settings) {
       return NextResponse.json({
-        windsor: { apiKey: null, dateRange: 'last_7d' },
+        windsor: { apiKey: null, dateRange: "last_7d" },
         notion: {
           configured: false,
           apiKey: null,
@@ -29,24 +60,32 @@ export async function GET() {
       });
     }
 
+    // 解密後遮罩顯示
+    const decryptedWindsorKey = settings.windsorApiKey
+      ? decryptApiKey(settings.windsorApiKey)
+      : null;
+    const decryptedNotionKey = settings.notionApiKey
+      ? decryptApiKey(settings.notionApiKey)
+      : null;
+
     return NextResponse.json({
       windsor: {
-        apiKey: settings.windsorApiKey ? maskApiKey(settings.windsorApiKey) : null,
+        apiKey: decryptedWindsorKey ? maskApiKey(decryptedWindsorKey) : null,
         dateRange: settings.windsorDateRange,
       },
       notion: {
         configured: !!(settings.notionApiKey && settings.notionParentPageId),
-        apiKey: settings.notionApiKey ? maskApiKey(settings.notionApiKey) : null,
+        apiKey: decryptedNotionKey ? maskApiKey(decryptedNotionKey) : null,
         parentPageId: settings.notionParentPageId,
         enabled: settings.notionEnabled,
       },
       thresholds: settings.thresholds,
     });
   } catch (error) {
-    console.error('讀取設定失敗:', error);
+    console.error("讀取設定失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '讀取設定失敗' },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "讀取設定失敗" },
+      { status: 500 },
     );
   }
 }
@@ -60,47 +99,60 @@ export async function PATCH(request: NextRequest) {
     const user = await getCurrentUser();
     const body = await request.json();
 
-    const updateData: any = {};
+    // Zod 驗證
+    const parsed = settingsSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "請求格式錯誤", details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+    const data = parsed.data;
+
+    const updateData: SettingsUpdateData = {};
 
     // Windsor 設定
-    if (body.windsor) {
-      if (body.windsor.apiKey) {
-        updateData.windsorApiKey = body.windsor.apiKey.trim();
+    if (data.windsor) {
+      if (data.windsor.apiKey) {
+        updateData.windsorApiKey = encryptApiKey(data.windsor.apiKey.trim());
       }
-      if (body.windsor.dateRange) {
-        updateData.windsorDateRange = body.windsor.dateRange;
+      if (data.windsor.dateRange) {
+        updateData.windsorDateRange = data.windsor.dateRange;
       }
     }
 
     // Notion 設定
-    if (body.notion) {
-      if (body.notion.apiKey !== undefined) {
-        updateData.notionApiKey = body.notion.apiKey?.trim() || null;
+    if (data.notion) {
+      if (data.notion.apiKey !== undefined) {
+        updateData.notionApiKey = data.notion.apiKey
+          ? encryptApiKey(data.notion.apiKey.trim())
+          : null;
       }
-      if (body.notion.parentPageId !== undefined) {
-        updateData.notionParentPageId = body.notion.parentPageId?.trim() || null;
+      if (data.notion.parentPageId !== undefined) {
+        updateData.notionParentPageId =
+          data.notion.parentPageId?.trim() || null;
       }
-      if (body.notion.enabled !== undefined) {
-        updateData.notionEnabled = body.notion.enabled;
+      if (data.notion.enabled !== undefined) {
+        updateData.notionEnabled = data.notion.enabled;
       }
     }
 
     // 閾值設定
-    if (body.thresholds) {
-      updateData.thresholds = body.thresholds;
+    if (data.thresholds) {
+      updateData.thresholds = data.thresholds;
     }
 
     await updateUserSettings(user.id, updateData);
 
     return NextResponse.json({
       success: true,
-      message: '設定已更新',
+      message: "設定已更新",
     });
   } catch (error) {
-    console.error('更新設定失敗:', error);
+    console.error("更新設定失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : '更新設定失敗' },
-      { status: 500 }
+      { error: error instanceof Error ? error.message : "更新設定失敗" },
+      { status: 500 },
     );
   }
 }

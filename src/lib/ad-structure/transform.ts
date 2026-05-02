@@ -81,35 +81,61 @@ function groupPausedChildren(
   return [...visible, group];
 }
 
-/** 計算節點的警報數量 */
+/**
+ * 警報索引：預先建立 Map 以加速警報計數查詢
+ * 將 O(n*a) 降低為 O(n+a)
+ */
+interface AlertIndex {
+  /** key: "account:::accountName" | "campaign:::acc:::camp" | "adset:::acc:::camp:::adset" | "ad:::acc:::camp:::adset:::ad" */
+  countMap: Map<string, number>;
+}
+
+function buildAlertIndex(alerts: Alert[]): AlertIndex {
+  const countMap = new Map<string, number>();
+
+  const increment = (key: string) => {
+    countMap.set(key, (countMap.get(key) || 0) + 1);
+  };
+
+  for (const a of alerts) {
+    if (a.adName && a.accountName && a.campaignName && a.adsetName) {
+      increment(
+        `ad:::${a.accountName}:::${a.campaignName}:::${a.adsetName}:::${a.adName}`,
+      );
+    } else if (a.adsetName && a.accountName && a.campaignName) {
+      increment(
+        `adset:::${a.accountName}:::${a.campaignName}:::${a.adsetName}`,
+      );
+    } else if (a.campaignName && a.accountName) {
+      increment(`campaign:::${a.accountName}:::${a.campaignName}`);
+    } else if (a.accountName) {
+      increment(`account:::${a.accountName}`);
+    }
+  }
+
+  return { countMap };
+}
+
+/** 使用預建索引計算節點的警報數量 */
 function countAlerts(
-  alerts: Alert[],
+  alertIndex: AlertIndex,
   level: NodeLevel,
   accountName: string,
   campaignName?: string,
   adsetName?: string,
   adName?: string,
 ): number {
-  return alerts.filter((a) => {
-    if (a.accountName && a.accountName !== accountName) return false;
-
-    if (level === "campaign" || level === "adset" || level === "ad") {
-      if (a.campaignName && a.campaignName !== campaignName) return false;
-    }
-
-    if (level === "adset" || level === "ad") {
-      if (a.adsetName && a.adsetName !== adsetName) return false;
-    }
-
-    if (level === "ad") {
-      if (a.adName && a.adName !== adName) return false;
-    }
-
-    if (level === "ad") return !!a.adName;
-    if (level === "adset") return !!a.adsetName;
-    if (level === "campaign") return !!a.campaignName;
-    return !!a.accountName;
-  }).length;
+  let key: string;
+  if (level === "ad") {
+    key = `ad:::${accountName}:::${campaignName}:::${adsetName}:::${adName}`;
+  } else if (level === "adset") {
+    key = `adset:::${accountName}:::${campaignName}:::${adsetName}`;
+  } else if (level === "campaign") {
+    key = `campaign:::${accountName}:::${campaignName}`;
+  } else {
+    key = `account:::${accountName}`;
+  }
+  return alertIndex.countMap.get(key) || 0;
 }
 
 /** 產生唯一節點 ID */
@@ -129,6 +155,9 @@ export function buildTree(
   records: WindsorAdRecord[],
   alerts: Alert[],
 ): TreeNode[] {
+  // 預建警報索引，避免每個節點都遍歷整個 alerts 陣列
+  const alertIdx = buildAlertIndex(alerts);
+
   const accountMap = new Map<
     string,
     Map<string, Map<string, WindsorAdRecord[]>>
@@ -198,7 +227,7 @@ export function buildTree(
           );
 
           const adAlertCount = countAlerts(
-            alerts,
+            alertIdx,
             "ad",
             accName,
             campName,
@@ -231,7 +260,7 @@ export function buildTree(
 
         const adsetMetrics = aggregateMetrics(adNodes);
         const adsetAlertCount =
-          countAlerts(alerts, "adset", accName, campName, adsetName) +
+          countAlerts(alertIdx, "adset", accName, campName, adsetName) +
           adNodes.reduce((sum, n) => sum + n.alertCount, 0);
 
         const activeAdCount = adNodes.filter(
@@ -261,7 +290,7 @@ export function buildTree(
 
       const campMetrics = aggregateMetrics(adsetNodes);
       const campAlertCount =
-        countAlerts(alerts, "campaign", accName, campName) +
+        countAlerts(alertIdx, "campaign", accName, campName) +
         adsetNodes.reduce((sum, n) => sum + n.alertCount, 0);
 
       // 非暫停（ACTIVE 或 UNKNOWN）即計入，避免連接器未回傳 status 時全為 0
@@ -302,7 +331,7 @@ export function buildTree(
 
     const accMetrics = aggregateMetrics(campaignNodes);
     const accAlertCount =
-      countAlerts(alerts, "account", accName) +
+      countAlerts(alertIdx, "account", accName) +
       campaignNodes.reduce((sum, n) => sum + n.alertCount, 0);
 
     trees.push({

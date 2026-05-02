@@ -5,6 +5,7 @@ import { DEFAULT_THRESHOLDS } from "@/lib/analysis/thresholds";
 import { buildDailyReportContent, buildReportTitle } from "@/lib/notion/report";
 import { createNotionPage } from "@/lib/notion/page-sync";
 import { getUserSettings } from "@/lib/db/repositories/user-settings";
+import { decryptApiKey } from "@/lib/utils/crypto";
 import {
   updateScheduleRunTime,
   getSyncSchedule,
@@ -23,8 +24,6 @@ export async function executeSyncForUser(
   userId: string,
   scheduleId: string,
 ): Promise<void> {
-  console.log(`🔄 開始執行使用者同步任務: ${userId}`);
-
   // 建立同步記錄
   const syncLog = await createSyncLog(userId);
 
@@ -38,14 +37,17 @@ export async function executeSyncForUser(
 
     // 檢查是否啟用自動同步
     if (!settings.notionEnabled) {
-      console.log(`⏸️  使用者 ${userId} 的自動同步已停用`);
       await failSyncLog(syncLog.id, "自動同步已停用");
       return;
     }
 
-    // 2. 驗證必要設定
-    const windsorApiKey = settings.windsorApiKey;
-    const notionApiKey = settings.notionApiKey;
+    // 2. 驗證必要設定並解密 API Key
+    const windsorApiKey = settings.windsorApiKey
+      ? decryptApiKey(settings.windsorApiKey)
+      : null;
+    const notionApiKey = settings.notionApiKey
+      ? decryptApiKey(settings.notionApiKey)
+      : null;
     const parentPageId = settings.notionParentPageId;
 
     if (!windsorApiKey) {
@@ -60,40 +62,29 @@ export async function executeSyncForUser(
 
     const dateRange = settings.windsorDateRange || "last_7d";
 
-    console.log(`📊 日期範圍: ${dateRange}`);
-
     // 3. 取得 Windsor 廣告資料
-    console.log("📊 正在取得 Windsor 廣告資料...");
     const query = buildAdPerformanceQuery("all", dateRange);
     const response = await fetchWindsor(windsorApiKey, query);
-    console.log(`✅ 成功取得 ${response.data.length} 筆廣告資料`);
 
     // 4. 執行分析
-    console.log("🔍 正在執行分析引擎...");
-
     // 使用儲存的閾值或預設值
     const thresholds = settings.thresholds
-      ? JSON.parse(JSON.stringify(settings.thresholds))
+      ? structuredClone(settings.thresholds)
       : DEFAULT_THRESHOLDS;
 
     const analysis = runFullAnalysis(response.data, thresholds);
-    console.log(`✅ 分析完成: ${analysis.alerts.length} 則警示`);
 
     // 5. 產生報告內容
     const reportTitle = buildReportTitle(analysis.dateRange);
     const reportContent = buildDailyReportContent(analysis);
-    console.log(`📝 報告標題: ${reportTitle}`);
 
     // 6. 建立 Notion Page
-    console.log("📤 正在建立 Notion Page...");
     const pageId = await createNotionPage(
       parentPageId,
       reportTitle,
       reportContent,
       notionApiKey,
     );
-
-    console.log(`✅ Notion Page 建立成功: ${pageId}`);
 
     // 7. 記錄成功
     await completeSyncLog(syncLog.id, {
@@ -114,10 +105,8 @@ export async function executeSyncForUser(
       const nextRunAt = interval.next().toDate();
       await updateScheduleRunTime(scheduleId, lastRunAt, nextRunAt);
     }
-
-    console.log(`✅ 使用者 ${userId} 同步完成!`);
   } catch (error) {
-    console.error(`❌ 使用者 ${userId} 同步失敗:`, error);
+    console.error(`使用者 ${userId} 同步失敗:`, error);
     await failSyncLog(
       syncLog.id,
       error instanceof Error ? error.message : String(error),

@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getCurrentUser } from "@/lib/auth/clerk";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { runFullAnalysis } from "@/lib/analysis/engine";
 import { buildDailyReportContent, buildReportTitle } from "@/lib/notion/report";
 
 export async function POST(request: NextRequest) {
+  const user = await getCurrentUser();
   const apiKey = request.headers.get("x-windsor-api-key");
   if (!apiKey) {
     return NextResponse.json(
@@ -33,7 +35,17 @@ export async function POST(request: NextRequest) {
       analysis,
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "報告產生失敗";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "報告產生失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
+      { status: 500 },
+    );
   }
 }
