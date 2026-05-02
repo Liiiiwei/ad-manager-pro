@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/clerk";
 import { syncToNotion } from "@/lib/cron/sync-notion";
 import { initCronJobs } from "@/lib/cron/scheduler";
+import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 // 在第一次 API 請求時初始化 Cron（singleton pattern）
 // 這確保在 Serverless 環境中 Cron 能夠正常運作
@@ -11,7 +12,13 @@ initCronJobs();
  * 手動觸發 Notion 同步
  * POST /api/sync-notion
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
+  const rateLimited = withRateLimit(request, {
+    maxRequests: 5,
+    windowMs: 60_000,
+  });
+  if (rateLimited) return rateLimited;
+
   const user = await getCurrentUser();
   try {
     // 檢查必要的環境變數

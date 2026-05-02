@@ -6,6 +6,7 @@ import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { runFullAnalysis } from "@/lib/analysis/engine";
 import { DEFAULT_THRESHOLDS } from "@/lib/analysis/thresholds";
 import type { AnalysisThresholds } from "@/lib/analysis/types";
+import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 // 閾值參數的 Zod 驗證 schema（防止 prototype pollution）
 const thresholdsSchema = z
@@ -21,6 +22,12 @@ const thresholdsSchema = z
   .strict();
 
 export async function GET(request: NextRequest) {
+  const rateLimited = withRateLimit(request, {
+    maxRequests: 10,
+    windowMs: 60_000,
+  });
+  if (rateLimited) return rateLimited;
+
   const user = await getCurrentUser();
   const apiKey = request.headers.get("x-windsor-api-key");
   if (!apiKey) {

@@ -4,8 +4,15 @@ import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { runFullAnalysis } from "@/lib/analysis/engine";
 import { buildDailyReportContent, buildReportTitle } from "@/lib/notion/report";
+import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 export async function POST(request: NextRequest) {
+  const rateLimited = withRateLimit(request, {
+    maxRequests: 10,
+    windowMs: 60_000,
+  });
+  if (rateLimited) return rateLimited;
+
   const user = await getCurrentUser();
   const apiKey = request.headers.get("x-windsor-api-key");
   if (!apiKey) {

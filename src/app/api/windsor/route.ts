@@ -6,10 +6,17 @@ import {
   buildDailyTrendQuery,
 } from "@/lib/windsor/queries";
 import type { WindsorQueryParams } from "@/lib/windsor/types";
+import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 const VALID_CONNECTORS = ["facebook", "google_ads", "all"] as const;
 
 export async function GET(request: NextRequest) {
+  const rateLimited = withRateLimit(request, {
+    maxRequests: 30,
+    windowMs: 60_000,
+  });
+  if (rateLimited) return rateLimited;
+
   const user = await getCurrentUser();
   const apiKey = request.headers.get("x-windsor-api-key");
   if (!apiKey) {

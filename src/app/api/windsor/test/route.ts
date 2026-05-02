@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/clerk";
 import { testApiKey } from "@/lib/windsor/client";
+import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 export async function POST(request: NextRequest) {
+  const rateLimited = withRateLimit(request, {
+    maxRequests: 5,
+    windowMs: 60_000,
+  });
+  if (rateLimited) return rateLimited;
+
   const user = await getCurrentUser();
   try {
     const { apiKey } = await request.json();

@@ -4,12 +4,16 @@ import { getCurrentUser } from "@/lib/auth/clerk";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { checkRules } from "@/lib/alerts/rule-checker";
+import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 /**
  * POST /api/alerts/check
  * 執行規則檢查，並儲存觸發的通知（每日去重）
  */
 export async function POST(req: NextRequest) {
+  const rateLimited = withRateLimit(req, { maxRequests: 10, windowMs: 60_000 });
+  if (rateLimited) return rateLimited;
+
   try {
     const user = await getCurrentUser();
 
