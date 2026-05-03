@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getApiKey } from "@/hooks/use-windsor-data";
 
 interface Notification {
   id: string;
@@ -75,14 +74,11 @@ export function useAlertNotifications(pollIntervalMs = 5 * 60 * 1000) {
   }, []);
 
   // 觸發規則檢查（背景操作，靜默處理錯誤）
+  // API Key 已改由 server-side 從 DB 讀取，前端不需傳送
   const triggerCheck = useCallback(async () => {
     try {
-      const apiKey = getApiKey();
-      if (!apiKey) return;
-
       await fetch("/api/alerts/check", {
         method: "POST",
-        headers: { "x-windsor-api-key": apiKey },
       });
       // 檢查完後重新取得通知
       await fetchNotifications();

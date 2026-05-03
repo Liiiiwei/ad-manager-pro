@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { getCurrentUser } from "@/lib/auth/clerk";
+import { decryptApiKey } from "@/lib/utils/crypto";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { checkRules } from "@/lib/alerts/rule-checker";
@@ -17,14 +18,17 @@ export async function POST(req: NextRequest) {
   try {
     const user = await getCurrentUser();
 
-    // 從 header 取得 Windsor API Key
-    const apiKey = req.headers.get("x-windsor-api-key");
-    if (!apiKey) {
+    // 從資料庫讀取 Windsor API Key
+    const settings = await prisma.userSettings.findFirst({
+      where: { userId: user.id },
+    });
+    if (!settings?.windsorApiKey) {
       return NextResponse.json(
-        { error: "缺少 x-windsor-api-key header" },
+        { error: "請先在設定頁面設定 Windsor API Key" },
         { status: 400 },
       );
     }
+    const apiKey = decryptApiKey(settings.windsorApiKey);
 
     // 取得使用者啟用的警報規則
     const rules = await prisma.alertRule.findMany({

@@ -86,7 +86,7 @@ export default function DashboardPage() {
     useDateRange();
   const { platform, setPlatform } = usePlatformFilter();
 
-  const { apiKey, ready } = useApiKey();
+  const { hasApiKey, ready } = useApiKey();
   const datePreset = resolveDatePreset(dateRange, includeToday);
 
   if (!ready) {
@@ -106,7 +106,7 @@ export default function DashboardPage() {
     );
   }
 
-  if (!apiKey) {
+  if (!hasApiKey) {
     return (
       <>
         <Header

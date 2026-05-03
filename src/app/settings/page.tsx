@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { DEFAULT_THRESHOLDS } from "@/lib/analysis/thresholds";
 import type { AnalysisThresholds } from "@/lib/analysis/types";
-import { setApiKey } from "@/hooks/use-windsor-data";
 import {
   WindsorSection,
   NotionSection,
@@ -100,12 +99,7 @@ export default function SettingsPage() {
     setSaveStatus(null);
 
     try {
-      // Windsor API Key 一律存到 localStorage（前端讀取來源）
-      if (windsorApiKey) {
-        setApiKey(windsorApiKey);
-      }
-
-      // 嘗試 server-side 儲存（資料庫可能未連線，不阻擋流程）
+      // 所有設定統一存到 server-side 資料庫
       let serverSaveOk = true;
       try {
         const settingsRes = await fetch("/api/settings", {
@@ -151,9 +145,7 @@ export default function SettingsPage() {
       }
 
       if (!serverSaveOk) {
-        console.warn(
-          "Server-side 設定儲存失敗（資料庫可能未連線），Windsor API Key 已存至本地",
-        );
+        console.warn("設定儲存失敗（資料庫可能未連線）");
       }
 
       setHasNotionConfig(true);
@@ -277,7 +269,7 @@ export default function SettingsPage() {
                       d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
                     />
                   </svg>
-                  本地設定已儲存，但伺服器同步失敗
+                  伺服器儲存失敗，請確認資料庫連線
                 </span>
               )}
               {saveStatus === "fail" && (

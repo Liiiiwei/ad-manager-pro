@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth/clerk";
+import { prisma } from "@/lib/db/prisma";
+import { decryptApiKey } from "@/lib/utils/crypto";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { runFullAnalysis } from "@/lib/analysis/engine";
@@ -29,13 +31,18 @@ export async function GET(request: NextRequest) {
   if (rateLimited) return rateLimited;
 
   const user = await getCurrentUser();
-  const apiKey = request.headers.get("x-windsor-api-key");
-  if (!apiKey) {
+
+  // 從資料庫讀取 Windsor API Key
+  const settings = await prisma.userSettings.findFirst({
+    where: { userId: user.id },
+  });
+  if (!settings?.windsorApiKey) {
     return NextResponse.json(
-      { error: "缺少 Windsor API Key" },
-      { status: 401 },
+      { error: "請先在設定頁面設定 Windsor API Key" },
+      { status: 400 },
     );
   }
+  const apiKey = decryptApiKey(settings.windsorApiKey);
 
   const { searchParams } = request.nextUrl;
   const dateRange = searchParams.get("dateRange") || "last_7d";

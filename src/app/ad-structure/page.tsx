@@ -18,7 +18,7 @@ export default function AdStructurePage() {
   const { dateRange, setDateRange, includeToday, setIncludeToday } =
     useDateRange();
   const { platform, setPlatform } = usePlatformFilter();
-  const { apiKey, ready } = useApiKey();
+  const { hasApiKey, ready } = useApiKey();
   const datePreset = resolveDatePreset(dateRange, includeToday);
 
   if (!ready) {
@@ -38,7 +38,7 @@ export default function AdStructurePage() {
     );
   }
 
-  if (!apiKey) {
+  if (!hasApiKey) {
     return (
       <>
         <Header

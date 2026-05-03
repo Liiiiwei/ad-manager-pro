@@ -13,7 +13,7 @@ export default function AlertsPage() {
   const { dateRange, setDateRange, includeToday, setIncludeToday } =
     useDateRange();
   const { platform, setPlatform } = usePlatformFilter();
-  const { apiKey, ready } = useApiKey();
+  const { hasApiKey, ready } = useApiKey();
 
   if (!ready) {
     return (
@@ -32,7 +32,7 @@ export default function AlertsPage() {
     );
   }
 
-  if (!apiKey) {
+  if (!hasApiKey) {
     return (
       <>
         <Header
