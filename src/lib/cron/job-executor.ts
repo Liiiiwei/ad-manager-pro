@@ -2,6 +2,7 @@ import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { runFullAnalysis } from "@/lib/analysis/engine";
 import { DEFAULT_THRESHOLDS } from "@/lib/analysis/thresholds";
+import type { AnalysisThresholds } from "@/lib/analysis/types";
 import { buildDailyReportContent, buildReportTitle } from "@/lib/notion/report";
 import { createNotionPage } from "@/lib/notion/page-sync";
 import { getUserSettings } from "@/lib/db/repositories/user-settings";
@@ -68,8 +69,8 @@ export async function executeSyncForUser(
 
     // 4. 執行分析
     // 使用儲存的閾值或預設值
-    const thresholds = settings.thresholds
-      ? structuredClone(settings.thresholds)
+    const thresholds: AnalysisThresholds = settings.thresholds
+      ? (structuredClone(settings.thresholds) as unknown as AnalysisThresholds)
       : DEFAULT_THRESHOLDS;
 
     const analysis = runFullAnalysis(response.data, thresholds);
