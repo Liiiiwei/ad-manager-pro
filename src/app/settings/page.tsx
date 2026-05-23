@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { DEFAULT_THRESHOLDS } from "@/lib/analysis/thresholds";
+import { DEFAULT_THRESHOLDS, mergeThresholds } from "@/lib/analysis/thresholds";
 import type { AnalysisThresholds } from "@/lib/analysis/types";
 import {
   WindsorSection,
@@ -62,7 +62,8 @@ export default function SettingsPage() {
         }
 
         if (data.thresholds) {
-          setThresholds(data.thresholds);
+          // 即使後端已回完整結構，前端再做一次巢狀合併防呆
+          setThresholds(mergeThresholds(data.thresholds));
         }
       } catch (err) {
         console.warn("設定載入失敗（API 可能不可用）:", err);
