@@ -1,24 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { requireWindsorApiKey } from "@/lib/auth/require-windsor-key";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { runFullAnalysis } from "@/lib/analysis/engine";
-import { DEFAULT_THRESHOLDS } from "@/lib/analysis/thresholds";
+import { DEFAULT_THRESHOLDS, mergeThresholds } from "@/lib/analysis/thresholds";
 import type { AnalysisThresholds } from "@/lib/analysis/types";
-
-// 閾值參數的 Zod 驗證 schema（防止 prototype pollution）
-const thresholdsSchema = z
-  .object({
-    lowROAS: z.number().finite().nonnegative().optional(),
-    highCPC: z.number().finite().nonnegative().optional(),
-    lowCTR: z.number().finite().nonnegative().optional(),
-    highCPM: z.number().finite().nonnegative().optional(),
-    minImpressions: z.number().finite().nonnegative().optional(),
-    minClicks: z.number().finite().nonnegative().optional(),
-    minSpend: z.number().finite().nonnegative().optional(),
-  })
-  .strict();
 
 export async function GET(request: NextRequest) {
   const gate = await requireWindsorApiKey(request, {
@@ -42,11 +28,9 @@ export async function GET(request: NextRequest) {
       );
     }
     try {
-      const parsed = thresholdsSchema.safeParse(JSON.parse(thresholdsParam));
-      if (parsed.success) {
-        thresholds = { ...DEFAULT_THRESHOLDS, ...parsed.data };
-      }
-      // 驗證失敗時使用預設值
+      // 與 /api/settings 共用 mergeThresholds：strict + finite + nonnegative
+      // 驗證失敗或部分覆寫都會回傳完整 AnalysisThresholds 結構
+      thresholds = mergeThresholds(JSON.parse(thresholdsParam));
     } catch {
       // JSON 解析失敗，使用預設值
     }
