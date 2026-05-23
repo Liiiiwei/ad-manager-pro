@@ -20,10 +20,11 @@ import { CronExpressionParser } from "cron-parser";
 
 /**
  * 執行個別使用者的 Notion 同步任務
+ * 手動觸發時 scheduleId 可省略
  */
 export async function executeSyncForUser(
   userId: string,
-  scheduleId: string,
+  scheduleId?: string,
 ): Promise<void> {
   // 建立同步記錄
   const syncLog = await createSyncLog(userId);
@@ -95,16 +96,18 @@ export async function executeSyncForUser(
       overallRoas: analysis.summary.overallRoas,
     });
 
-    // 8. 更新排程的執行時間
-    const schedule = await getSyncSchedule(userId);
-    if (schedule) {
-      const lastRunAt = new Date();
-      const interval = CronExpressionParser.parse(schedule.cronExpression, {
-        currentDate: lastRunAt,
-        tz: schedule.timezone,
-      });
-      const nextRunAt = interval.next().toDate();
-      await updateScheduleRunTime(scheduleId, lastRunAt, nextRunAt);
+    // 8. 更新排程的執行時間（僅 cron 觸發時更新）
+    if (scheduleId) {
+      const schedule = await getSyncSchedule(userId);
+      if (schedule) {
+        const lastRunAt = new Date();
+        const interval = CronExpressionParser.parse(schedule.cronExpression, {
+          currentDate: lastRunAt,
+          tz: schedule.timezone,
+        });
+        const nextRunAt = interval.next().toDate();
+        await updateScheduleRunTime(scheduleId, lastRunAt, nextRunAt);
+      }
     }
   } catch (error) {
     console.error(`使用者 ${userId} 同步失敗:`, error);

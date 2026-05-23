@@ -1,49 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/clerk";
-import { syncToNotion } from "@/lib/cron/sync-notion";
+import { executeSyncForUser } from "@/lib/cron/job-executor";
 import { initCronJobs } from "@/lib/cron/scheduler";
+import { getUserSettings } from "@/lib/db/repositories/user-settings";
+import { getSyncSchedule } from "@/lib/db/repositories/sync-schedule";
 import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
-// 在第一次 API 請求時初始化 Cron（singleton pattern）
-// 這確保在 Serverless 環境中 Cron 能夠正常運作
+// 在第一次 API 請求時初始化動態 Cron（singleton pattern）
 initCronJobs();
 
 /**
- * 手動觸發 Notion 同步
+ * 手動觸發 Notion 同步（僅同步當前登入使用者的資料）
  * POST /api/sync-notion
  */
 export async function POST(request: NextRequest) {
-  const rateLimited = withRateLimit(request, {
-    maxRequests: 5,
-    windowMs: 60_000,
-  });
+  const user = await getCurrentUser();
+  const rateLimited = withRateLimit(
+    request,
+    { maxRequests: 5, windowMs: 60_000 },
+    { identifier: user.id },
+  );
   if (rateLimited) return rateLimited;
 
-  const user = await getCurrentUser();
+  // 前置條件：使用者必須先在 Settings 頁面設好 Windsor + Notion 兩組 key
+  const settings = await getUserSettings(user.id);
+  if (!settings?.windsorApiKey) {
+    return NextResponse.json(
+      { error: "缺少 Windsor API Key", code: "WINDSOR_KEY_MISSING" },
+      { status: 412 },
+    );
+  }
+  if (!settings.notionApiKey) {
+    return NextResponse.json(
+      { error: "缺少 Notion API Key", code: "NOTION_KEY_MISSING" },
+      { status: 412 },
+    );
+  }
+  if (!settings.notionParentPageId) {
+    return NextResponse.json(
+      { error: "缺少 Notion Parent Page ID", code: "NOTION_PARENT_MISSING" },
+      { status: 412 },
+    );
+  }
+
   try {
-    // 檢查必要的環境變數
-    if (!process.env.WINDSOR_API_KEY) {
-      return NextResponse.json(
-        { error: "缺少環境變數: WINDSOR_API_KEY" },
-        { status: 500 },
-      );
-    }
-    if (!process.env.NOTION_API_KEY) {
-      return NextResponse.json(
-        { error: "缺少環境變數: NOTION_API_KEY" },
-        { status: 500 },
-      );
-    }
-    if (!process.env.NOTION_PARENT_PAGE_ID) {
-      return NextResponse.json(
-        { error: "缺少環境變數: NOTION_PARENT_PAGE_ID" },
-        { status: 500 },
-      );
-    }
-
-    // 執行同步
-    await syncToNotion();
-
+    await executeSyncForUser(user.id);
     return NextResponse.json({
       success: true,
       message: "Notion 同步已完成",
@@ -67,23 +68,25 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * 取得同步狀態
+ * 取得當前登入使用者的同步狀態
  * GET /api/sync-notion
  */
 export async function GET() {
   const user = await getCurrentUser();
-  const hasWindsorKey = !!process.env.WINDSOR_API_KEY;
-  const hasNotionKey = !!process.env.NOTION_API_KEY;
-  const hasParentPageId = !!process.env.NOTION_PARENT_PAGE_ID;
-  const autoSyncEnabled =
-    process.env.ENABLE_AUTO_SYNC?.toLowerCase() !== "false";
+  const settings = await getUserSettings(user.id);
+  const schedule = await getSyncSchedule(user.id);
 
+  const hasWindsorKey = !!settings?.windsorApiKey;
+  const hasNotionKey = !!settings?.notionApiKey;
+  const hasParentPageId = !!settings?.notionParentPageId;
   const isConfigured = hasWindsorKey && hasNotionKey && hasParentPageId;
 
   return NextResponse.json({
     configured: isConfigured,
-    autoSync: autoSyncEnabled,
-    schedule: process.env.CRON_SCHEDULE || "0 9 * * *",
+    autoSync: schedule?.enabled ?? false,
+    schedule: schedule?.cronExpression ?? null,
+    nextRunAt: schedule?.nextRunAt ?? null,
+    lastRunAt: schedule?.lastRunAt ?? null,
     missingConfig: {
       windsorApiKey: !hasWindsorKey,
       notionApiKey: !hasNotionKey,
