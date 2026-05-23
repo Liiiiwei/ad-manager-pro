@@ -200,4 +200,33 @@ describe("executeSyncForUser", () => {
     expect(getSyncSchedule).not.toHaveBeenCalled();
     expect(updateScheduleRunTime).not.toHaveBeenCalled();
   });
+
+  it("scheduleId 與該 user 的 schedule.id 不匹配 → 不寫 schedule 表（防跨租戶）", async () => {
+    vi.doMock("cron-parser", () => ({
+      CronExpressionParser: {
+        parse: () => ({ next: () => ({ toDate: () => new Date() }) }),
+      },
+    }));
+    const { getSyncSchedule, updateScheduleRunTime } =
+      await import("@/lib/db/repositories/sync-schedule");
+    vi.mocked(getUserSettings).mockResolvedValue(settings());
+    vi.mocked(fetchWindsor).mockResolvedValue({ data: [] } as never);
+    vi.mocked(createNotionPage).mockResolvedValue("page-y");
+    // user-1 自己的 schedule 是 sched-A，但 caller 傳了 sched-B
+    vi.mocked(getSyncSchedule).mockResolvedValue({
+      id: "sched-A",
+      userId: "user-1",
+      cronExpression: "0 0 * * *",
+      timezone: "UTC",
+      enabled: true,
+      lastRunAt: null,
+      nextRunAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    } as never);
+
+    await executeSyncForUser("user-1", "sched-B");
+
+    expect(updateScheduleRunTime).not.toHaveBeenCalled();
+  });
 });

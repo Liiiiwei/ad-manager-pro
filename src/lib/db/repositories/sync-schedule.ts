@@ -67,16 +67,23 @@ export async function getActiveSchedules() {
 
 /**
  * 更新排程的執行時間
+ * 同時用 scheduleId + userId 當 where，避免 caller 配錯 pair 造成跨租戶寫入
  */
 export async function updateScheduleRunTime(
   scheduleId: string,
+  userId: string,
   lastRunAt: Date,
   nextRunAt: Date,
 ): Promise<void> {
-  await prisma.syncSchedule.update({
-    where: { id: scheduleId },
+  const result = await prisma.syncSchedule.updateMany({
+    where: { id: scheduleId, userId },
     data: { lastRunAt, nextRunAt },
   });
+  if (result.count === 0) {
+    throw new Error(
+      `Schedule ${scheduleId} 不存在或不屬於 user ${userId}（拒絕跨租戶寫入）`,
+    );
+  }
 }
 
 /**

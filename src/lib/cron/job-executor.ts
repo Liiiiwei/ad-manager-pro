@@ -97,16 +97,18 @@ export async function executeSyncForUser(
     });
 
     // 8. 更新排程的執行時間（僅 cron 觸發時更新）
+    // 用查到的 schedule.id 而非 caller 傳入的 scheduleId，並把 userId 一併送進去
+    // repository 端會用 (id, userId) 雙條件 where，拒絕跨租戶寫入
     if (scheduleId) {
       const schedule = await getSyncSchedule(userId);
-      if (schedule) {
+      if (schedule && schedule.id === scheduleId) {
         const lastRunAt = new Date();
         const interval = CronExpressionParser.parse(schedule.cronExpression, {
           currentDate: lastRunAt,
           tz: schedule.timezone,
         });
         const nextRunAt = interval.next().toDate();
-        await updateScheduleRunTime(scheduleId, lastRunAt, nextRunAt);
+        await updateScheduleRunTime(schedule.id, userId, lastRunAt, nextRunAt);
       }
     }
   } catch (error) {
