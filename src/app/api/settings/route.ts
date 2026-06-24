@@ -20,17 +20,6 @@ interface SettingsUpdateData {
   thresholds?: Prisma.InputJsonValue;
 }
 
-/** dashboardVisibility 的 schema（限定已知 key，避免 prototype pollution）*/
-const dashboardVisibilitySchema = z
-  .object({
-    summary: z.boolean().optional(),
-    alerts: z.boolean().optional(),
-    platform: z.boolean().optional(),
-    trend: z.boolean().optional(),
-    campaigns: z.boolean().optional(),
-  })
-  .strict();
-
 /** PATCH 請求的 Zod 驗證 schema */
 const settingsSchema = z
   .object({
@@ -48,7 +37,6 @@ const settingsSchema = z
       })
       .optional(),
     thresholds: thresholdsSchema.optional(),
-    dashboardVisibility: dashboardVisibilitySchema.optional(),
   })
   .strict();
 

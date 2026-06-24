@@ -42,9 +42,16 @@ export async function POST(request: NextRequest) {
       { status: 412 },
     );
   }
+  if (!settings.notionEnabled) {
+    return NextResponse.json(
+      { error: "Notion 同步已停用，請先在設定頁啟用", code: "NOTION_DISABLED" },
+      { status: 412 },
+    );
+  }
 
   try {
-    await executeSyncForUser(user.id);
+    // throwOnError: true → executor 失敗會 re-throw，避免回傳誤導性的 200 成功
+    await executeSyncForUser(user.id, undefined, { throwOnError: true });
     return NextResponse.json({
       success: true,
       message: "Notion 同步已完成",

@@ -188,6 +188,29 @@ describe("executeSyncForUser", () => {
     expect(completeSyncLog).not.toHaveBeenCalled();
   });
 
+  it("throwOnError=true（手動觸發）失敗時 → 寫 failSyncLog 後 re-throw", async () => {
+    vi.mocked(getUserSettings).mockResolvedValue(settings());
+    vi.mocked(fetchWindsor).mockRejectedValue(new Error("Windsor 503"));
+
+    await expect(
+      executeSyncForUser("user-1", undefined, { throwOnError: true }),
+    ).rejects.toThrow("Windsor 503");
+
+    expect(failSyncLog).toHaveBeenCalledWith(
+      "log-1",
+      expect.stringContaining("Windsor 503"),
+    );
+  });
+
+  it("throwOnError 預設 false（cron 觸發）失敗時 → 只寫 failSyncLog 不丟出", async () => {
+    vi.mocked(getUserSettings).mockResolvedValue(settings());
+    vi.mocked(fetchWindsor).mockRejectedValue(new Error("Windsor 503"));
+
+    // 不應 reject
+    await expect(executeSyncForUser("user-1")).resolves.toBeUndefined();
+    expect(failSyncLog).toHaveBeenCalled();
+  });
+
   it("不傳 scheduleId（手動觸發）→ 不查也不寫 schedule 表", async () => {
     const { getSyncSchedule, updateScheduleRunTime } =
       await import("@/lib/db/repositories/sync-schedule");
