@@ -278,7 +278,7 @@ function DashboardContent({
           title="ROAS"
           value={formatRoas(filteredSummary?.overallRoas ?? 0)}
           icon={kpiIcons.roas}
-          iconBg="bg-blue-50 text-accent"
+          iconBg="bg-accent-light text-accent"
         />
         <KpiCard
           title="轉換數"
