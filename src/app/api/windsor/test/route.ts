@@ -4,13 +4,14 @@ import { testApiKey } from "@/lib/windsor/client";
 import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 export async function POST(request: NextRequest) {
-  const rateLimited = withRateLimit(request, {
-    maxRequests: 5,
-    windowMs: 60_000,
-  });
+  const user = await getCurrentUser();
+  const rateLimited = withRateLimit(
+    request,
+    { maxRequests: 5, windowMs: 60_000 },
+    { identifier: user.id },
+  );
   if (rateLimited) return rateLimited;
 
-  const user = await getCurrentUser();
   try {
     const { apiKey } = await request.json();
 

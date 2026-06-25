@@ -20,11 +20,18 @@ import { CronExpressionParser } from "cron-parser";
 
 /**
  * 執行個別使用者的 Notion 同步任務
+ * 手動觸發時 scheduleId 可省略
+ *
+ * options.throwOnError：
+ *   - false（預設，cron 觸發）：失敗只寫 failSyncLog，不往外丟，避免單一使用者失敗中斷整個排程
+ *   - true（手動 API 觸發）：寫完 failSyncLog 後再 re-throw，讓路由能回傳真正的失敗狀態而非誤導性 200
  */
 export async function executeSyncForUser(
   userId: string,
-  scheduleId: string,
+  scheduleId?: string,
+  options?: { throwOnError?: boolean },
 ): Promise<void> {
+  const throwOnError = options?.throwOnError ?? false;
   // 建立同步記錄
   const syncLog = await createSyncLog(userId);
 
@@ -36,10 +43,9 @@ export async function executeSyncForUser(
       throw new Error("找不到使用者設定");
     }
 
-    // 檢查是否啟用自動同步
+    // 檢查是否啟用自動同步（失敗統一由 catch 寫 failSyncLog）
     if (!settings.notionEnabled) {
-      await failSyncLog(syncLog.id, "自動同步已停用");
-      return;
+      throw new Error("自動同步已停用");
     }
 
     // 2. 驗證必要設定並解密 API Key
@@ -95,16 +101,20 @@ export async function executeSyncForUser(
       overallRoas: analysis.summary.overallRoas,
     });
 
-    // 8. 更新排程的執行時間
-    const schedule = await getSyncSchedule(userId);
-    if (schedule) {
-      const lastRunAt = new Date();
-      const interval = CronExpressionParser.parse(schedule.cronExpression, {
-        currentDate: lastRunAt,
-        tz: schedule.timezone,
-      });
-      const nextRunAt = interval.next().toDate();
-      await updateScheduleRunTime(scheduleId, lastRunAt, nextRunAt);
+    // 8. 更新排程的執行時間（僅 cron 觸發時更新）
+    // 用查到的 schedule.id 而非 caller 傳入的 scheduleId，並把 userId 一併送進去
+    // repository 端會用 (id, userId) 雙條件 where，拒絕跨租戶寫入
+    if (scheduleId) {
+      const schedule = await getSyncSchedule(userId);
+      if (schedule && schedule.id === scheduleId) {
+        const lastRunAt = new Date();
+        const interval = CronExpressionParser.parse(schedule.cronExpression, {
+          currentDate: lastRunAt,
+          tz: schedule.timezone,
+        });
+        const nextRunAt = interval.next().toDate();
+        await updateScheduleRunTime(schedule.id, userId, lastRunAt, nextRunAt);
+      }
     }
   } catch (error) {
     console.error(`使用者 ${userId} 同步失敗:`, error);
@@ -112,5 +122,9 @@ export async function executeSyncForUser(
       syncLog.id,
       error instanceof Error ? error.message : String(error),
     );
+    // 手動觸發時把錯誤往外丟，讓 API 路由能正確回報失敗
+    if (throwOnError) {
+      throw error;
+    }
   }
 }

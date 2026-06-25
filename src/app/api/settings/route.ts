@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/clerk";
 import {
   getUserSettings,
@@ -7,6 +8,8 @@ import {
 } from "@/lib/db/repositories/user-settings";
 import { maskApiKey } from "@/lib/utils/format";
 import { encryptApiKey, decryptApiKey } from "@/lib/utils/crypto";
+import { mergeThresholds, thresholdsSchema } from "@/lib/analysis/thresholds";
+
 /** 設定更新資料型別 */
 interface SettingsUpdateData {
   windsorApiKey?: string | null;
@@ -14,7 +17,7 @@ interface SettingsUpdateData {
   notionApiKey?: string | null;
   notionParentPageId?: string | null;
   notionEnabled?: boolean;
-  thresholds?: Record<string, number>;
+  thresholds?: Prisma.InputJsonValue;
 }
 
 /** PATCH 請求的 Zod 驗證 schema */
@@ -33,8 +36,7 @@ const settingsSchema = z
         enabled: z.boolean().optional(),
       })
       .optional(),
-    thresholds: z.record(z.number().finite()).optional(),
-    dashboardVisibility: z.record(z.boolean()).optional(),
+    thresholds: thresholdsSchema.optional(),
   })
   .strict();
 
@@ -56,7 +58,7 @@ export async function GET() {
           parentPageId: null,
           enabled: true,
         },
-        thresholds: null,
+        thresholds: mergeThresholds(null),
       });
     }
 
@@ -79,12 +81,21 @@ export async function GET() {
         parentPageId: settings.notionParentPageId,
         enabled: settings.notionEnabled,
       },
-      thresholds: settings.thresholds,
+      // 與 default 合併，前端不會因 DB 殘留舊版欄位而拿到不完整結構
+      thresholds: mergeThresholds(settings.thresholds),
     });
   } catch (error) {
     console.error("讀取設定失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "讀取設定失敗" },
+      {
+        error: "讀取設定失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }
@@ -137,9 +148,11 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    // 閾值設定
+    // 閾值設定：用 mergeThresholds 補齊缺欄位，避免 DB 寫入部分結構
     if (data.thresholds) {
-      updateData.thresholds = data.thresholds;
+      updateData.thresholds = mergeThresholds(
+        data.thresholds,
+      ) as unknown as Prisma.InputJsonValue;
     }
 
     await updateUserSettings(user.id, updateData);
@@ -151,7 +164,15 @@ export async function PATCH(request: NextRequest) {
   } catch (error) {
     console.error("更新設定失敗:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "更新設定失敗" },
+      {
+        error: "更新設定失敗",
+        details:
+          process.env.NODE_ENV === "production"
+            ? undefined
+            : error instanceof Error
+              ? error.message
+              : String(error),
+      },
       { status: 500 },
     );
   }

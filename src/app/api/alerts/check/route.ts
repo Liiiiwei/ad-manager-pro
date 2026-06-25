@@ -1,35 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { getCurrentUser } from "@/lib/auth/clerk";
-import { decryptApiKey } from "@/lib/utils/crypto";
+import { requireWindsorApiKey } from "@/lib/auth/require-windsor-key";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { checkRules } from "@/lib/alerts/rule-checker";
-import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 /**
  * POST /api/alerts/check
  * 執行規則檢查，並儲存觸發的通知（每日去重）
  */
 export async function POST(req: NextRequest) {
-  const rateLimited = withRateLimit(req, { maxRequests: 10, windowMs: 60_000 });
-  if (rateLimited) return rateLimited;
+  const gate = await requireWindsorApiKey(req, {
+    maxRequests: 10,
+    windowMs: 60_000,
+  });
+  if (gate instanceof NextResponse) return gate;
+  const { user, apiKey } = gate;
 
   try {
-    const user = await getCurrentUser();
-
-    // 從資料庫讀取 Windsor API Key
-    const settings = await prisma.userSettings.findFirst({
-      where: { userId: user.id },
-    });
-    if (!settings?.windsorApiKey) {
-      return NextResponse.json(
-        { error: "請先在設定頁面設定 Windsor API Key" },
-        { status: 400 },
-      );
-    }
-    const apiKey = decryptApiKey(settings.windsorApiKey);
-
     // 取得使用者啟用的警報規則
     const rules = await prisma.alertRule.findMany({
       where: { userId: user.id, enabled: true },

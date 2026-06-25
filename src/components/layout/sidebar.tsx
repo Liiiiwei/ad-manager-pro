@@ -145,7 +145,7 @@ export default function Sidebar() {
             </svg>
           </div>
           <div>
-            <h1 className="text-sm font-bold text-white leading-tight">
+            <h1 className="font-display text-sm font-bold text-white leading-tight tracking-tight">
               Ad Manager Pro
             </h1>
             <p className="text-[10px] text-sidebar-text leading-tight">

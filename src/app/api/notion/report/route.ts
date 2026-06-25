@@ -1,33 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/clerk";
-import { prisma } from "@/lib/db/prisma";
-import { decryptApiKey } from "@/lib/utils/crypto";
+import { requireWindsorApiKey } from "@/lib/auth/require-windsor-key";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { runFullAnalysis } from "@/lib/analysis/engine";
 import { buildDailyReportContent, buildReportTitle } from "@/lib/notion/report";
-import { withRateLimit } from "@/lib/utils/with-rate-limit";
 
 export async function POST(request: NextRequest) {
-  const rateLimited = withRateLimit(request, {
+  const gate = await requireWindsorApiKey(request, {
     maxRequests: 10,
     windowMs: 60_000,
   });
-  if (rateLimited) return rateLimited;
-
-  const user = await getCurrentUser();
-
-  // 從資料庫讀取 Windsor API Key
-  const settings = await prisma.userSettings.findFirst({
-    where: { userId: user.id },
-  });
-  if (!settings?.windsorApiKey) {
-    return NextResponse.json(
-      { error: "請先在設定頁面設定 Windsor API Key" },
-      { status: 400 },
-    );
-  }
-  const apiKey = decryptApiKey(settings.windsorApiKey);
+  if (gate instanceof NextResponse) return gate;
+  const { apiKey } = gate;
 
   try {
     const body = await request.json();
