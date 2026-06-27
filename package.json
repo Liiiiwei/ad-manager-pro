@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "concurrently -k -n db,next -c blue,green \"prisma dev\" \"next dev\"",
     "build": "prisma generate && prisma db push && next build",
     "start": "next start",
     "lint": "eslint",
@@ -39,6 +39,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^10.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.1.1",
     "prisma": "^7.4.2",
