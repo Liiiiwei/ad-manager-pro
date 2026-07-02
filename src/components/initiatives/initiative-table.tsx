@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useMemo, Fragment } from "react";
-import type { InitiativeRow } from "@/lib/initiatives/types";
+import type { InitiativeRow, AccountSummary } from "@/lib/initiatives/types";
+import { pacingLevel, PACING_TEXT, PACING_BG } from "@/lib/initiatives/pacing";
 import { formatCurrency, formatRoas, formatNumber } from "@/lib/utils/format";
 
 interface InitiativeTableProps {
   rows: InitiativeRow[];
+  accounts: AccountSummary[];
 }
 
-type SortField = "spend" | "budget" | "roas" | "cpa" | "progress";
+type SortField = "spend" | "roas" | "cpa" | "progress";
 
 /** ROAS 顏色語意（≥3 佳、<1 警） */
 function roasColor(roas: number): string {
@@ -24,8 +26,9 @@ function progressBarColor(progress: number): string {
   return "bg-accent";
 }
 
-/** 花費 / 預算的進度呈現（有 lifetime 顯示進度條、僅日預算顯示 chip、皆無顯示 —）*/
+/** 花費 / 預算呈現：lifetime 用單向消耗、日預算用雙向配速、皆無顯示 — */
 function BudgetCell({ row }: { row: InitiativeRow }) {
+  // lifetime 預算：消耗語意（總額用完為止，滿了才紅）
   if (row.hasBudget) {
     const pct = row.progress * 100;
     const clamped = Math.min(pct, 100);
@@ -39,7 +42,7 @@ function BudgetCell({ row }: { row: InitiativeRow }) {
             {pct.toFixed(0)}%
           </span>
         </div>
-        <div className="h-1.5 w-full rounded-full bg-gray-100 overflow-hidden">
+        <div className="h-1.5 w-full rounded-full bg-background overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${progressBarColor(row.progress)}`}
             style={{ width: `${clamped}%` }}
@@ -48,6 +51,36 @@ function BudgetCell({ row }: { row: InitiativeRow }) {
       </div>
     );
   }
+  // 日預算：配速語意（花太慢或太快都要示警，雙向三色）
+  if (row.periodBudget > 0) {
+    const pct = row.pacingProgress * 100;
+    const clamped = Math.min(pct, 100);
+    const level = pacingLevel(row.pacingProgress);
+    return (
+      <div className="min-w-[140px]">
+        <div className="flex items-center justify-between text-xs mb-1">
+          <span className="font-mono tabular-nums text-foreground">
+            {formatCurrency(row.spend)} / {formatCurrency(row.periodBudget)}
+          </span>
+          <span
+            className={`font-mono tabular-nums font-semibold ml-2 ${PACING_TEXT[level]}`}
+          >
+            {pct.toFixed(0)}%
+          </span>
+        </div>
+        <div className="h-1.5 w-full rounded-full bg-background overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${PACING_BG[level]}`}
+            style={{ width: `${clamped}%` }}
+          />
+        </div>
+        <div className="text-[11px] text-muted mt-0.5 font-mono tabular-nums">
+          日預算 {formatCurrency(row.dailyBudget)}/天
+        </div>
+      </div>
+    );
+  }
+  // 有日預算但無 ACTIVE 活動（全暫停）：維持 chip
   if (row.dailyBudget > 0) {
     return (
       <span className="inline-flex items-center rounded-md bg-info/10 text-info text-xs px-2 py-0.5 font-mono tabular-nums">
@@ -58,7 +91,10 @@ function BudgetCell({ row }: { row: InitiativeRow }) {
   return <span className="text-muted text-sm">—</span>;
 }
 
-export default function InitiativeTable({ rows }: InitiativeTableProps) {
+export default function InitiativeTable({
+  rows,
+  accounts,
+}: InitiativeTableProps) {
   const [sortField, setSortField] = useState<SortField>("spend");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
@@ -81,6 +117,19 @@ export default function InitiativeTable({ rows }: InitiativeTableProps) {
     });
   }
 
+  /** 排序取值：progress 用有效達成率（lifetime 消耗或日預算配速）*/
+  function sortValue(r: InitiativeRow, field: SortField): number {
+    if (field === "progress") {
+      return r.hasBudget ? r.progress : r.pacingProgress;
+    }
+    return r[field];
+  }
+
+  const accountMap = useMemo(
+    () => new Map(accounts.map((a) => [a.accountName, a])),
+    [accounts],
+  );
+
   // 依帳號分組，組內依排序欄位排序
   const groups = useMemo(() => {
     const byAccount = new Map<string, InitiativeRow[]>();
@@ -91,8 +140,8 @@ export default function InitiativeTable({ rows }: InitiativeTableProps) {
     }
     const sortRows = (list: InitiativeRow[]) =>
       [...list].sort((a, b) => {
-        const av = a[sortField];
-        const bv = b[sortField];
+        const av = sortValue(a, sortField);
+        const bv = sortValue(b, sortField);
         return sortDir === "asc" ? av - bv : bv - av;
       });
     return [...byAccount.entries()]
@@ -106,7 +155,7 @@ export default function InitiativeTable({ rows }: InitiativeTableProps) {
 
   const columns: { key: SortField; label: string }[] = [
     { key: "spend", label: "花費" },
-    { key: "budget", label: "花費 / 預算" },
+    { key: "progress", label: "花費 / 預算" },
     { key: "roas", label: "ROAS" },
     { key: "cpa", label: "CPA" },
   ];
@@ -125,7 +174,7 @@ export default function InitiativeTable({ rows }: InitiativeTableProps) {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-card-border bg-gray-50">
+            <tr className="border-b border-card-border bg-background/60">
               <th className="text-left text-xs font-medium text-muted px-4 py-3 w-8" />
               <th className="text-left text-xs font-medium text-muted px-4 py-3">
                 活動
@@ -150,14 +199,41 @@ export default function InitiativeTable({ rows }: InitiativeTableProps) {
             {groups.map((group) => (
               <Fragment key={group.accountName}>
                 {/* 帳號分組列 */}
-                <tr className="bg-gray-50/60 border-b border-card-border">
+                <tr className="bg-background/60 border-b border-card-border">
                   <td colSpan={2 + columns.length} className="px-4 py-2">
-                    <span className="text-xs font-semibold text-muted uppercase tracking-wide">
-                      {group.accountName}
-                    </span>
-                    <span className="ml-2 text-xs text-muted font-mono tabular-nums">
-                      {formatCurrency(group.spend)}
-                    </span>
+                    {(() => {
+                      const acc = accountMap.get(group.accountName);
+                      const level = acc?.hasBudget
+                        ? pacingLevel(acc.progress)
+                        : null;
+                      return (
+                        <span className="inline-flex items-center gap-2">
+                          <span className="text-xs font-semibold text-muted uppercase tracking-wide">
+                            {group.accountName}
+                          </span>
+                          {acc?.hasBudget && level ? (
+                            <>
+                              <span className="text-xs text-muted font-mono tabular-nums">
+                                {formatCurrency(acc.spend)} /{" "}
+                                {formatCurrency(acc.periodBudget)}
+                              </span>
+                              <span
+                                className={`text-xs font-semibold font-mono tabular-nums ${PACING_TEXT[level]}`}
+                              >
+                                {(acc.progress * 100).toFixed(0)}%
+                              </span>
+                              <span
+                                className={`w-2 h-2 rounded-full ${PACING_BG[level]}`}
+                              />
+                            </>
+                          ) : (
+                            <span className="text-xs text-muted font-mono tabular-nums">
+                              {formatCurrency(group.spend)}
+                            </span>
+                          )}
+                        </span>
+                      );
+                    })()}
                   </td>
                 </tr>
 
@@ -167,7 +243,7 @@ export default function InitiativeTable({ rows }: InitiativeTableProps) {
                     <Fragment key={row.key}>
                       <tr
                         onClick={() => toggle(row.key)}
-                        className="border-b border-card-border hover:bg-gray-50 transition-colors cursor-pointer"
+                        className="border-b border-card-border hover:bg-background/60 transition-colors cursor-pointer"
                       >
                         <td className="px-4 py-3 text-muted">
                           <svg
@@ -213,7 +289,7 @@ export default function InitiativeTable({ rows }: InitiativeTableProps) {
                         row.campaigns.map((c) => (
                           <tr
                             key={`${row.key}::${c.campaign}`}
-                            className="border-b border-card-border bg-gray-50/40"
+                            className="border-b border-card-border bg-background/40"
                           >
                             <td />
                             <td className="px-4 py-2 pl-8">
