@@ -4,6 +4,7 @@ import { fetchWindsor } from "@/lib/windsor/client";
 import {
   buildAdPerformanceQuery,
   buildDailyTrendQuery,
+  buildInitiativeQuery,
 } from "@/lib/windsor/queries";
 import type { WindsorQueryParams } from "@/lib/windsor/types";
 
@@ -33,6 +34,8 @@ export async function GET(request: NextRequest) {
 
     if (level === "trend") {
       query = buildDailyTrendQuery(connector, dateRange);
+    } else if (level === "initiative") {
+      query = buildInitiativeQuery(connector, dateRange);
     } else {
       query = buildAdPerformanceQuery(connector, dateRange);
     }

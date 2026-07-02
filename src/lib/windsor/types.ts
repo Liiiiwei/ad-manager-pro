@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { rateToTwd } from "@/lib/utils/currency";
 
 /** API 查詢參數 */
 export interface WindsorQueryParams {
@@ -78,6 +79,12 @@ const windsorRawSchema = z
     conversions: nullableNumber(),
     revenue: nullableNumber(),
     roas: nullableNumber(),
+    // Meta 預算欄位（活動層級，快照值非流水）
+    campaign_lifetime_budget: nullableNumber(),
+    campaign_daily_budget: nullableNumber(),
+    campaign_budget_remaining: nullableNumber(),
+    // 帳戶幣別（用於換算成 TWD）；缺值時預設 TWD 不換算
+    account_currency: nullableString("TWD"),
   })
   .passthrough();
 
@@ -110,6 +117,10 @@ export interface WindsorAdRecord {
   campaignStatus: string;
   adsetStatus: string;
   adStatus: string;
+  // Meta 活動預算（快照值，聚合時取每個 campaign 一次，勿跨日加總）
+  campaignLifetimeBudget: number;
+  campaignDailyBudget: number;
+  campaignBudgetRemaining: number;
 }
 
 /** 將 Windsor 原始資料正規化為統一格式 */
@@ -119,6 +130,8 @@ export function normalizeRecord(
   const purchases = raw.actions_purchase || 0;
   const purchaseValue = raw.action_values_omni_purchase || 0;
   const wpRoas = raw.website_purchase_roas || 0;
+  // 帳戶幣別對 TWD 的匯率；金額欄位一律換算為 TWD，比率欄位（ROAS/CTR）不受影響
+  const rate = rateToTwd(raw.account_currency);
 
   return {
     date: raw.date,
@@ -132,27 +145,31 @@ export function normalizeRecord(
     // adset_name 為 Windsor API 實際回傳欄位，adset 為備援
     adset: raw.adset_name || raw.adset,
     ad_name: raw.ad_name,
-    spend: raw.spend,
+    spend: raw.spend * rate,
     impressions: raw.impressions,
     clicks: raw.clicks,
     frequency: raw.frequency,
-    cpc: raw.cpc,
-    cpm: raw.cpm,
+    cpc: raw.cpc * rate,
+    cpm: raw.cpm * rate,
     ctr: raw.ctr,
     // 正規化轉換：優先使用 Meta 特有欄位，備援使用通用欄位
     conversions: purchases || raw.conversions || 0,
-    revenue: purchaseValue || raw.revenue || 0,
+    revenue: (purchaseValue || raw.revenue || 0) * rate,
+    // ROAS 為比率（收益/花費），幣別換算後不變，故以原幣別值計算
     roas: wpRoas || raw.roas || (raw.spend > 0 ? purchaseValue / raw.spend : 0),
     // 電商指標
     purchases,
     addToCart: raw.actions_add_to_cart || 0,
     initiateCheckout: raw.actions_initiate_checkout || 0,
     leads: raw.actions_lead || 0,
-    purchaseValue,
-    addToCartValue: raw.action_values_add_to_cart || 0,
+    purchaseValue: purchaseValue * rate,
+    addToCartValue: (raw.action_values_add_to_cart || 0) * rate,
     campaignStatus: (raw.campaign_status || "").toUpperCase(),
     adsetStatus: (raw.adset_status || "").toUpperCase(),
     adStatus: (raw.ad_status || "").toUpperCase(),
+    campaignLifetimeBudget: (raw.campaign_lifetime_budget || 0) * rate,
+    campaignDailyBudget: (raw.campaign_daily_budget || 0) * rate,
+    campaignBudgetRemaining: (raw.campaign_budget_remaining || 0) * rate,
   };
 }
 

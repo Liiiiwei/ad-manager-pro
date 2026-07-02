@@ -5,8 +5,8 @@ const AD_PERFORMANCE_FIELDS = [
   "date",
   "source",
   "account_name",
+  "account_currency",
   "campaign",
-  "adset",
   "adset_name",
   "ad_name",
   "campaign_status",
@@ -70,6 +70,26 @@ export function buildDailyTrendQuery(
   };
 }
 
+/** 行銷活動總覽所需欄位（在成效欄位上加 Meta 活動預算，僅 Meta 有）*/
+const INITIATIVE_FIELDS = [
+  ...AD_PERFORMANCE_FIELDS,
+  "campaign_lifetime_budget",
+  "campaign_daily_budget",
+  "campaign_budget_remaining",
+];
+
+/** 取得行銷活動總覽資料（含預算欄位）*/
+export function buildInitiativeQuery(
+  connector: WindsorQueryParams["connector"],
+  datePreset: string,
+): WindsorQueryParams {
+  return {
+    connector,
+    fields: INITIATIVE_FIELDS,
+    date_preset: datePreset,
+  };
+}
+
 /** 取得廣告層級資料（用於素材疲勞偵測） */
 export function buildAdLevelQuery(
   connector: WindsorQueryParams["connector"],
@@ -82,4 +102,4 @@ export function buildAdLevelQuery(
   };
 }
 
-export { AD_PERFORMANCE_FIELDS, DAILY_TREND_FIELDS };
+export { AD_PERFORMANCE_FIELDS, DAILY_TREND_FIELDS, INITIATIVE_FIELDS };

@@ -1,8 +1,8 @@
 /** 格式化貨幣 */
 export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
+  return new Intl.NumberFormat("zh-TW", {
     style: "currency",
-    currency: "USD",
+    currency: "TWD",
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(value);

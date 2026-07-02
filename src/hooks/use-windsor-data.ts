@@ -39,8 +39,12 @@ export function useApiKey(): { hasApiKey: boolean; ready: boolean } {
   return { hasApiKey, ready };
 }
 
-/** 取得 Windsor 廣告資料 */
-export function useWindsorData(dateRange: string, platform: string) {
+/** 取得 Windsor 廣告資料（level 可選：campaign 預設、initiative 會多帶預算欄位）*/
+export function useWindsorData(
+  dateRange: string,
+  platform: string,
+  level?: string,
+) {
   const [data, setData] = useState<WindsorAdRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -57,8 +61,9 @@ export function useWindsorData(dateRange: string, platform: string) {
             ? "google_ads"
             : "all";
 
+      const levelParam = level ? `&level=${level}` : "";
       const res = await fetch(
-        `/api/windsor?connector=${connector}&dateRange=${dateRange}`,
+        `/api/windsor?connector=${connector}&dateRange=${dateRange}${levelParam}`,
       );
 
       if (!res.ok) {
@@ -73,7 +78,7 @@ export function useWindsorData(dateRange: string, platform: string) {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, platform]);
+  }, [dateRange, platform, level]);
 
   useEffect(() => {
     fetchData();

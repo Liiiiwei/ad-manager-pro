@@ -30,6 +30,9 @@ function makeRecord(overrides: Partial<WindsorAdRecord> = {}): WindsorAdRecord {
     campaignStatus: "ACTIVE",
     adsetStatus: "ACTIVE",
     adStatus: "ACTIVE",
+    campaignLifetimeBudget: 0,
+    campaignDailyBudget: 0,
+    campaignBudgetRemaining: 0,
     ...overrides,
   };
 }

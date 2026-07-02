@@ -50,3 +50,6 @@ Thumbs.db
 
 # clerk configuration (can include secrets)
 /.clerk/
+
+# Playwright MCP debug logs
+.playwright-mcp/
