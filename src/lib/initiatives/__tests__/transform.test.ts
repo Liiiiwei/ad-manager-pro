@@ -3,6 +3,7 @@ import {
   initiativeKey,
   aggregateInitiatives,
   countDistinctDates,
+  aggregateAccounts,
 } from "../transform";
 import type { WindsorAdRecord } from "@/lib/windsor/types";
 
@@ -265,5 +266,112 @@ describe("aggregateInitiatives - 配速預算", () => {
     ]);
     expect(rows[0].periodBudget).toBe(0);
     expect(rows[0].pacingProgress).toBe(0);
+  });
+});
+
+describe("aggregateAccounts", () => {
+  it("期間預算只計 ACTIVE 活動：Σ日預算 × 天數；暫停活動花費仍計入", () => {
+    const s = aggregateAccounts(
+      [
+        makeRecord({
+          campaign: "A_x",
+          spend: 100,
+          campaignDailyBudget: 500,
+          campaignStatus: "ACTIVE",
+        }),
+        makeRecord({
+          campaign: "B_x",
+          spend: 50,
+          campaignDailyBudget: 300,
+          campaignStatus: "PAUSED",
+        }),
+      ],
+      7,
+    );
+    expect(s).toHaveLength(1);
+    expect(s[0].periodBudget).toBe(3500);
+    expect(s[0].spend).toBe(150);
+    expect(s[0].progress).toBeCloseTo(150 / 3500);
+    expect(s[0].hasBudget).toBe(true);
+  });
+
+  it("lifetime 活動以 lifetime 金額計入且不乘天數", () => {
+    const s = aggregateAccounts(
+      [
+        makeRecord({
+          campaign: "A_x",
+          campaignLifetimeBudget: 10000,
+          campaignDailyBudget: 500,
+          campaignStatus: "ACTIVE",
+        }),
+        makeRecord({
+          campaign: "B_x",
+          campaignDailyBudget: 200,
+          campaignStatus: "ACTIVE",
+        }),
+      ],
+      7,
+    );
+    // lifetime 10000 + ACTIVE 日預算 200×7 = 11400
+    expect(s[0].periodBudget).toBe(11400);
+  });
+
+  it("日預算為快照：同活動跨日取最大值不加總", () => {
+    const s = aggregateAccounts(
+      [
+        makeRecord({
+          campaign: "A_x",
+          date: "2024-01-01",
+          campaignDailyBudget: 500,
+          campaignStatus: "ACTIVE",
+        }),
+        makeRecord({
+          campaign: "A_x",
+          date: "2024-01-02",
+          campaignDailyBudget: 500,
+          campaignStatus: "ACTIVE",
+        }),
+      ],
+      7,
+    );
+    expect(s[0].periodBudget).toBe(3500);
+  });
+
+  it("狀態取最新日期：後來暫停的活動不計入分母", () => {
+    const s = aggregateAccounts(
+      [
+        makeRecord({
+          campaign: "A_x",
+          date: "2024-01-01",
+          campaignDailyBudget: 500,
+          campaignStatus: "ACTIVE",
+        }),
+        makeRecord({
+          campaign: "A_x",
+          date: "2024-01-02",
+          campaignDailyBudget: 500,
+          campaignStatus: "PAUSED",
+        }),
+      ],
+      7,
+    );
+    expect(s[0].periodBudget).toBe(0);
+    expect(s[0].hasBudget).toBe(false);
+    expect(s[0].progress).toBe(0);
+  });
+
+  it("不同帳號分開彙總，依花費由高到低排序", () => {
+    const s = aggregateAccounts(
+      [
+        makeRecord({ account_name: "魔幻主義", spend: 100 }),
+        makeRecord({ account_name: "Plaisir", spend: 900 }),
+      ],
+      7,
+    );
+    expect(s.map((a) => a.accountName)).toEqual(["Plaisir", "魔幻主義"]);
+  });
+
+  it("空資料回傳空陣列", () => {
+    expect(aggregateAccounts([], 7)).toEqual([]);
   });
 });

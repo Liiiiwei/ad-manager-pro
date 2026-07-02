@@ -50,3 +50,18 @@ export interface InitiativeRow {
   // 展開明細
   campaigns: InitiativeCampaign[];
 }
+
+/** 帳號層級的預算配速摘要 */
+export interface AccountSummary {
+  accountName: string;
+  /** 平台顯示名（Meta / Google / 其他）*/
+  platform: string;
+  /** 全部活動花費（含已暫停）*/
+  spend: number;
+  /** 期間預算：Σ(ACTIVE 活動日預算) × 天數；lifetime 活動改以 lifetime 金額計入（不乘天數）*/
+  periodBudget: number;
+  /** periodBudget > 0 */
+  hasBudget: boolean;
+  /** 花費 ÷ 期間預算；無期間預算為 0 */
+  progress: number;
+}

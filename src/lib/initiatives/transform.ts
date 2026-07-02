@@ -1,5 +1,9 @@
 import type { WindsorAdRecord } from "@/lib/windsor/types";
-import type { InitiativeRow, InitiativeCampaign } from "./types";
+import type {
+  InitiativeRow,
+  InitiativeCampaign,
+  AccountSummary,
+} from "./types";
 
 /** 由 campaign 名稱與帳號推導活動鍵（帳號＋第一個 _ 之前的前綴）*/
 export function initiativeKey(
@@ -177,4 +181,88 @@ export function aggregateInitiatives(
 /** 期間天數：取資料中的不重複日期數（含今天時當天未跑完，進度會略偏低）*/
 export function countDistinctDates(records: WindsorAdRecord[]): number {
   return new Set(records.map((r) => r.date)).size;
+}
+
+/** 帳號內單一 campaign 的預算/狀態累加狀態 */
+interface AccountCampaignAcc {
+  lifetimeBudget: number;
+  dailyBudget: number;
+  status: string;
+  statusDate: string;
+}
+
+/** 帳號內部的可變累加狀態 */
+interface AccountAcc {
+  accountName: string;
+  platform: string;
+  spend: number;
+  /** key: campaign 名稱 */
+  campaigns: Map<string, AccountCampaignAcc>;
+}
+
+/** 將原始廣告記錄彙總為帳號層級的預算配速摘要（依花費由高到低）*/
+export function aggregateAccounts(
+  records: WindsorAdRecord[],
+  days: number,
+): AccountSummary[] {
+  const map = new Map<string, AccountAcc>();
+
+  for (const r of records) {
+    const accountName = r.account_name?.trim() || "未命名帳戶";
+    let acc = map.get(accountName);
+    if (!acc) {
+      acc = {
+        accountName,
+        platform: platformLabel(r.source),
+        spend: 0,
+        campaigns: new Map(),
+      };
+      map.set(accountName, acc);
+    }
+    // 花費計入全部活動（含已暫停）
+    acc.spend += r.spend;
+
+    const campName = r.campaign?.trim() || "未命名";
+    let camp = acc.campaigns.get(campName);
+    if (!camp) {
+      camp = { lifetimeBudget: 0, dailyBudget: 0, status: "", statusDate: "" };
+      acc.campaigns.set(campName, camp);
+    }
+    // 預算快照：跨日取最大值（勿加總）
+    camp.lifetimeBudget = Math.max(
+      camp.lifetimeBudget,
+      r.campaignLifetimeBudget,
+    );
+    camp.dailyBudget = Math.max(camp.dailyBudget, r.campaignDailyBudget);
+    // 狀態取最新日期那筆
+    if (r.date >= camp.statusDate) {
+      camp.status = r.campaignStatus;
+      camp.statusDate = r.date;
+    }
+  }
+
+  const summaries: AccountSummary[] = [];
+  for (const acc of map.values()) {
+    let periodBudget = 0;
+    for (const c of acc.campaigns.values()) {
+      if (c.lifetimeBudget > 0) {
+        // lifetime 為總額上限，比推算值可信，直接計入（不乘天數）
+        periodBudget += c.lifetimeBudget;
+      } else if (c.status === "ACTIVE") {
+        periodBudget += c.dailyBudget * days;
+      }
+    }
+    const hasBudget = periodBudget > 0;
+    summaries.push({
+      accountName: acc.accountName,
+      platform: acc.platform,
+      spend: acc.spend,
+      periodBudget,
+      hasBudget,
+      progress: hasBudget ? acc.spend / periodBudget : 0,
+    });
+  }
+
+  // 依花費由高到低（帳號卡片顯示順序）
+  return summaries.sort((a, b) => b.spend - a.spend);
 }
