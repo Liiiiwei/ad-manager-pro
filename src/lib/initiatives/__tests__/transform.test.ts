@@ -181,6 +181,22 @@ describe("aggregateInitiatives", () => {
     const names = rows[0].campaigns.map((c) => c.campaign).sort();
     expect(names).toEqual(["夏季購物_觸及", "夏季購物_轉換"]);
   });
+
+  it("campaign 狀態取最新日期那筆", () => {
+    const rows = aggregateInitiatives([
+      makeRecord({ date: "2024-01-01", campaignStatus: "ACTIVE" }),
+      makeRecord({ date: "2024-01-02", campaignStatus: "PAUSED" }),
+    ]);
+    expect(rows[0].campaigns[0].status).toBe("PAUSED");
+  });
+
+  it("資料順序顛倒仍取最新日期狀態", () => {
+    const rows = aggregateInitiatives([
+      makeRecord({ date: "2024-01-02", campaignStatus: "PAUSED" }),
+      makeRecord({ date: "2024-01-01", campaignStatus: "ACTIVE" }),
+    ]);
+    expect(rows[0].campaigns[0].status).toBe("PAUSED");
+  });
 });
 
 describe("countDistinctDates", () => {

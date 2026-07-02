@@ -33,6 +33,9 @@ interface CampaignAcc {
   /** 預算為快照：取跨日的最大值（同值重複，用 max 穩健處理 0 補值）*/
   lifetimeBudget: number;
   dailyBudget: number;
+  /** 投放狀態：取最新日期那筆（statusDate 記錄該筆日期）*/
+  status: string;
+  statusDate: string;
 }
 
 /** 活動內部的可變累加狀態 */
@@ -91,6 +94,8 @@ export function aggregateInitiatives(
         conversions: 0,
         lifetimeBudget: 0,
         dailyBudget: 0,
+        status: "",
+        statusDate: "",
       };
       init.campaigns.set(campName, camp);
     }
@@ -103,6 +108,11 @@ export function aggregateInitiatives(
       r.campaignLifetimeBudget,
     );
     camp.dailyBudget = Math.max(camp.dailyBudget, r.campaignDailyBudget);
+    // 狀態取最新日期那筆（日期為 YYYY-MM-DD，字串比較即可）
+    if (r.date >= camp.statusDate) {
+      camp.status = r.campaignStatus;
+      camp.statusDate = r.date;
+    }
   }
 
   const rows: InitiativeRow[] = [];
@@ -123,6 +133,7 @@ export function aggregateInitiatives(
         cpa: c.conversions > 0 ? c.spend / c.conversions : 0,
         lifetimeBudget: c.lifetimeBudget,
         dailyBudget: c.dailyBudget,
+        status: c.status,
       });
     }
 

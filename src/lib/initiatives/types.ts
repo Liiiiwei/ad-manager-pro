@@ -10,6 +10,8 @@ export interface InitiativeCampaign {
   cpa: number;
   lifetimeBudget: number;
   dailyBudget: number;
+  /** 投放狀態（取期間內最新日期那筆；ACTIVE / PAUSED / 其他 / 空字串未知）*/
+  status: string;
 }
 
 /** 一個行銷活動（同帳號、campaign 名稱第一個 _ 前綴相同者合併）*/
