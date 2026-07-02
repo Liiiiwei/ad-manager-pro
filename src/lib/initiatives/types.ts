@@ -41,6 +41,12 @@ export interface InitiativeRow {
   hasBudget: boolean; // 是否有可算總進度的預算（lifetime > 0）
   progress: number; // 花費/預算，無預算為 0
 
+  // 配速推算
+  /** 配速推算期間預算：Σ(ACTIVE 活動日預算) × 天數；lifetime 活動走消耗語意不計入 */
+  periodBudget: number;
+  /** 配速達成率 = 花費 ÷ periodBudget；有 lifetime 預算或無期間預算時為 0 */
+  pacingProgress: number;
+
   // 展開明細
   campaigns: InitiativeCampaign[];
 }

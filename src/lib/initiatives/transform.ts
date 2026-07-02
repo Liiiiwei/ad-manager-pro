@@ -54,6 +54,7 @@ interface InitiativeAcc {
 /** 將原始廣告記錄依「帳號＋前綴」合併為行銷活動列 */
 export function aggregateInitiatives(
   records: WindsorAdRecord[],
+  days = 0,
 ): InitiativeRow[] {
   const map = new Map<string, InitiativeAcc>();
 
@@ -140,6 +141,15 @@ export function aggregateInitiatives(
     const hasBudget = lifetimeBudget > 0;
     const budget = lifetimeBudget;
 
+    // 配速推算：只計 ACTIVE 且無 lifetime 的活動日預算（lifetime 活動走消耗語意）
+    let activeDailyBudget = 0;
+    for (const c of init.campaigns.values()) {
+      if (c.lifetimeBudget === 0 && c.status === "ACTIVE") {
+        activeDailyBudget += c.dailyBudget;
+      }
+    }
+    const periodBudget = hasBudget ? 0 : activeDailyBudget * days;
+
     rows.push({
       accountName: init.accountName,
       prefix: init.prefix,
@@ -155,6 +165,8 @@ export function aggregateInitiatives(
       budget,
       hasBudget,
       progress: hasBudget ? init.spend / budget : 0,
+      periodBudget,
+      pacingProgress: periodBudget > 0 ? init.spend / periodBudget : 0,
       campaigns,
     });
   }

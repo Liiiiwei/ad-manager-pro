@@ -214,3 +214,56 @@ describe("countDistinctDates", () => {
     expect(countDistinctDates([])).toBe(0);
   });
 });
+
+describe("aggregateInitiatives - 配速預算", () => {
+  it("日預算活動的期間預算 = Σ(ACTIVE 日預算) × 天數，並算出配速達成率", () => {
+    const rows = aggregateInitiatives(
+      [
+        makeRecord({
+          campaign: "夏季購物_轉換",
+          spend: 2800,
+          campaignDailyBudget: 500,
+          campaignStatus: "ACTIVE",
+        }),
+        makeRecord({
+          campaign: "夏季購物_觸及",
+          spend: 200,
+          campaignDailyBudget: 300,
+          campaignStatus: "PAUSED",
+        }),
+      ],
+      7,
+    );
+    // 只計 ACTIVE 的 500 × 7 = 3500；花費含暫停活動 = 3000
+    expect(rows[0].periodBudget).toBe(3500);
+    expect(rows[0].pacingProgress).toBeCloseTo(3000 / 3500);
+  });
+
+  it("有 lifetime 預算的活動列走消耗語意：pacingProgress 為 0", () => {
+    const rows = aggregateInitiatives(
+      [
+        makeRecord({
+          campaign: "夏季購物_轉換",
+          campaignLifetimeBudget: 10000,
+          campaignDailyBudget: 500,
+          campaignStatus: "ACTIVE",
+        }),
+      ],
+      7,
+    );
+    expect(rows[0].hasBudget).toBe(true);
+    expect(rows[0].pacingProgress).toBe(0);
+  });
+
+  it("未帶天數（預設 0）時 periodBudget 為 0、pacingProgress 為 0", () => {
+    const rows = aggregateInitiatives([
+      makeRecord({
+        campaign: "夏季購物_轉換",
+        campaignDailyBudget: 500,
+        campaignStatus: "ACTIVE",
+      }),
+    ]);
+    expect(rows[0].periodBudget).toBe(0);
+    expect(rows[0].pacingProgress).toBe(0);
+  });
+});
