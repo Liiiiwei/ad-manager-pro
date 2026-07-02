@@ -150,3 +150,8 @@ export function aggregateInitiatives(
 
   return rows;
 }
+
+/** 期間天數：取資料中的不重複日期數（含今天時當天未跑完，進度會略偏低）*/
+export function countDistinctDates(records: WindsorAdRecord[]): number {
+  return new Set(records.map((r) => r.date)).size;
+}

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { initiativeKey, aggregateInitiatives } from "../transform";
+import {
+  initiativeKey,
+  aggregateInitiatives,
+  countDistinctDates,
+} from "../transform";
 import type { WindsorAdRecord } from "@/lib/windsor/types";
 
 // 建立測試用的廣告記錄（含 Meta 預算欄位）
@@ -176,5 +180,21 @@ describe("aggregateInitiatives", () => {
     ]);
     const names = rows[0].campaigns.map((c) => c.campaign).sort();
     expect(names).toEqual(["夏季購物_觸及", "夏季購物_轉換"]);
+  });
+});
+
+describe("countDistinctDates", () => {
+  it("回傳不重複日期數", () => {
+    expect(
+      countDistinctDates([
+        makeRecord({ date: "2024-01-01" }),
+        makeRecord({ date: "2024-01-01", campaign: "另一活動_x" }),
+        makeRecord({ date: "2024-01-02" }),
+      ]),
+    ).toBe(2);
+  });
+
+  it("空資料為 0", () => {
+    expect(countDistinctDates([])).toBe(0);
   });
 });
