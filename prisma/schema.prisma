@@ -36,6 +36,7 @@ model UserSettings {
   notionEnabled      Boolean @default(true)
   windsorDateRange   String  @default("last_7d")
   thresholds         Json?
+  accountBudgets     Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

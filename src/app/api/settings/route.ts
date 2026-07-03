@@ -9,6 +9,10 @@ import {
 import { maskApiKey } from "@/lib/utils/format";
 import { encryptApiKey, decryptApiKey } from "@/lib/utils/crypto";
 import { mergeThresholds, thresholdsSchema } from "@/lib/analysis/thresholds";
+import {
+  accountBudgetsSchema,
+  mergeAccountBudgets,
+} from "@/lib/settings/account-budgets";
 
 /** 設定更新資料型別 */
 interface SettingsUpdateData {
@@ -18,6 +22,7 @@ interface SettingsUpdateData {
   notionParentPageId?: string | null;
   notionEnabled?: boolean;
   thresholds?: Prisma.InputJsonValue;
+  accountBudgets?: Prisma.InputJsonValue;
 }
 
 /** PATCH 請求的 Zod 驗證 schema */
@@ -37,6 +42,7 @@ const settingsSchema = z
       })
       .optional(),
     thresholds: thresholdsSchema.optional(),
+    accountBudgets: accountBudgetsSchema.optional(),
   })
   .strict();
 
@@ -59,6 +65,7 @@ export async function GET() {
           enabled: true,
         },
         thresholds: mergeThresholds(null),
+        accountBudgets: {},
       });
     }
 
@@ -83,6 +90,7 @@ export async function GET() {
       },
       // 與 default 合併，前端不會因 DB 殘留舊版欄位而拿到不完整結構
       thresholds: mergeThresholds(settings.thresholds),
+      accountBudgets: settings.accountBudgets ?? {},
     });
   } catch (error) {
     console.error("讀取設定失敗:", error);
@@ -153,6 +161,15 @@ export async function PATCH(request: NextRequest) {
       updateData.thresholds = mergeThresholds(
         data.thresholds,
       ) as unknown as Prisma.InputJsonValue;
+    }
+
+    // 帳號手動月預算：merge 語意（只動送來的 key；null 刪除該 key）
+    if (data.accountBudgets) {
+      const existing = await getUserSettings(user.id);
+      updateData.accountBudgets = mergeAccountBudgets(
+        existing?.accountBudgets,
+        data.accountBudgets,
+      ) as Prisma.InputJsonValue;
     }
 
     await updateUserSettings(user.id, updateData);
