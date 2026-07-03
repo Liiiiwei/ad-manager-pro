@@ -200,10 +200,19 @@ interface AccountAcc {
   campaigns: Map<string, AccountCampaignAcc>;
 }
 
+/** 帳號手動月預算選項 */
+export interface AccountBudgetOptions {
+  /** 帳號名稱 → 手動月預算（原幣別） */
+  manualBudgets: Record<string, number>;
+  /** 當月天數（呼叫端以使用者當下月份計算） */
+  daysInMonth: number;
+}
+
 /** 將原始廣告記錄彙總為帳號層級的預算配速摘要（依花費由高到低）*/
 export function aggregateAccounts(
   records: WindsorAdRecord[],
   days: number,
+  budgetOptions?: AccountBudgetOptions,
 ): AccountSummary[] {
   const map = new Map<string, AccountAcc>();
 
@@ -252,7 +261,22 @@ export function aggregateAccounts(
         periodBudget += c.dailyBudget * days;
       }
     }
+
+    // 手動月預算優先：換算成期間預算，覆寫 API 推算值
+    const manual = budgetOptions?.manualBudgets[acc.accountName] ?? 0;
+    const daysInMonth = budgetOptions?.daysInMonth ?? 0;
+    let budgetSource: "manual" | "api" | undefined;
+    let monthlyBudget: number | undefined;
+    if (manual > 0 && daysInMonth > 0) {
+      periodBudget = (manual / daysInMonth) * days;
+      budgetSource = "manual";
+      monthlyBudget = manual;
+    }
+
     const hasBudget = periodBudget > 0;
+    if (budgetSource === undefined && hasBudget) {
+      budgetSource = "api";
+    }
     summaries.push({
       accountName: acc.accountName,
       platform: acc.platform,
@@ -260,6 +284,8 @@ export function aggregateAccounts(
       periodBudget,
       hasBudget,
       progress: hasBudget ? acc.spend / periodBudget : 0,
+      budgetSource,
+      monthlyBudget,
     });
   }
 

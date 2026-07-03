@@ -64,4 +64,8 @@ export interface AccountSummary {
   hasBudget: boolean;
   /** 花費 ÷ 期間預算；無期間預算為 0 */
   progress: number;
+  /** 預算來源：manual = 手動月預算換算；api = 平台預算推算；無預算時 undefined */
+  budgetSource?: "manual" | "api";
+  /** 手動月預算原始值（budgetSource === "manual" 時存在，原幣別） */
+  monthlyBudget?: number;
 }

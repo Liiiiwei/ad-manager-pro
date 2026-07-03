@@ -375,3 +375,66 @@ describe("aggregateAccounts", () => {
     expect(aggregateAccounts([], 7)).toEqual([]);
   });
 });
+
+describe("aggregateAccounts 手動月預算", () => {
+  const budgetOptions = { manualBudgets: { 魔幻主義: 31000 }, daysInMonth: 31 };
+
+  it("手動值覆寫 API 推算：有 ACTIVE 日預算仍用手動月預算換算", () => {
+    const records = [
+      makeRecord({ campaignDailyBudget: 500, campaignStatus: "ACTIVE" }),
+    ];
+    const [acc] = aggregateAccounts(records, 7, budgetOptions);
+    // 31000 ÷ 31 天 × 7 天 = 7000（非 API 的 500 × 7 = 3500）
+    expect(acc.periodBudget).toBe(7000);
+    expect(acc.hasBudget).toBe(true);
+    expect(acc.budgetSource).toBe("manual");
+    expect(acc.monthlyBudget).toBe(31000);
+  });
+
+  it("手動值補位：無任何 API 預算時 hasBudget 為 true", () => {
+    const records = [
+      makeRecord({ campaignDailyBudget: 0, campaignStatus: "ACTIVE" }),
+    ];
+    const [acc] = aggregateAccounts(records, 7, budgetOptions);
+    expect(acc.hasBudget).toBe(true);
+    expect(acc.periodBudget).toBe(7000);
+    expect(acc.budgetSource).toBe("manual");
+  });
+
+  it("無手動值時結果與未傳 budgetOptions 完全相同，budgetSource 為 api", () => {
+    const records = [
+      makeRecord({ campaignDailyBudget: 500, campaignStatus: "ACTIVE" }),
+    ];
+    const withEmpty = aggregateAccounts(records, 7, {
+      manualBudgets: {},
+      daysInMonth: 31,
+    });
+    const without = aggregateAccounts(records, 7);
+    expect(withEmpty).toEqual(without);
+    expect(withEmpty[0].budgetSource).toBe("api");
+    expect(withEmpty[0].periodBudget).toBe(3500);
+  });
+
+  it("無手動值且無 API 預算時 budgetSource 為 undefined", () => {
+    const records = [
+      makeRecord({ campaignDailyBudget: 0, campaignStatus: "ACTIVE" }),
+    ];
+    const [acc] = aggregateAccounts(records, 7);
+    expect(acc.hasBudget).toBe(false);
+    expect(acc.budgetSource).toBeUndefined();
+    expect(acc.monthlyBudget).toBeUndefined();
+  });
+
+  it("daysInMonth 為 0 時落回 API 邏輯（防除以零）", () => {
+    const records = [
+      makeRecord({ campaignDailyBudget: 500, campaignStatus: "ACTIVE" }),
+    ];
+    const [acc] = aggregateAccounts(records, 7, {
+      manualBudgets: { 魔幻主義: 31000 },
+      daysInMonth: 0,
+    });
+    expect(acc.periodBudget).toBe(3500);
+    expect(acc.budgetSource).toBe("api");
+    expect(acc.monthlyBudget).toBeUndefined();
+  });
+});
