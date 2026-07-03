@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useWindsorData, useApiKey } from "@/hooks/use-windsor-data";
+import { useAccountBudgets } from "@/hooks/use-account-budgets";
 import { useDateRange, resolveDatePreset } from "@/hooks/use-date-range";
 import { usePlatformFilter } from "@/hooks/use-platform-filter";
 import {
@@ -89,6 +90,15 @@ function InitiativesContent({
     "initiative",
   );
 
+  // 帳號手動月預算（budgets 載入前為空物件，畫面與現狀相同，載入後自動重算）
+  const { budgets, saveBudget } = useAccountBudgets();
+
+  // 當月天數（使用者本地時區），供手動月預算換算為期間預算
+  const daysInMonth = useMemo(() => {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  }, []);
+
   // 期間天數（不重複日期數），供期間預算推算
   const days = useMemo(() => countDistinctDates(data), [data]);
 
@@ -106,8 +116,9 @@ function InitiativesContent({
 
   // 帳號層級配速摘要（卡片區用全部；KPI 尊重帳號篩選）
   const accountSummaries = useMemo(
-    () => aggregateAccounts(data, days),
-    [data, days],
+    () =>
+      aggregateAccounts(data, days, { manualBudgets: budgets, daysInMonth }),
+    [data, days, budgets, daysInMonth],
   );
   const filteredSummaries = useMemo(() => {
     if (selectedAccounts.length === 0) return accountSummaries;
@@ -172,6 +183,7 @@ function InitiativesContent({
           accounts={accountSummaries}
           selectedAccounts={selectedAccounts}
           onAccountsChange={onAccountsChange}
+          onSaveBudget={saveBudget}
         />
         <InitiativeTable rows={rows} accounts={accountSummaries} />
       </div>
