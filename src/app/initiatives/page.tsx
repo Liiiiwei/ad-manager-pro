@@ -4,10 +4,15 @@ import { useState, useMemo } from "react";
 import { useWindsorData, useApiKey } from "@/hooks/use-windsor-data";
 import { useDateRange, resolveDatePreset } from "@/hooks/use-date-range";
 import { usePlatformFilter } from "@/hooks/use-platform-filter";
-import { aggregateInitiatives } from "@/lib/initiatives/transform";
+import {
+  aggregateInitiatives,
+  aggregateAccounts,
+  countDistinctDates,
+} from "@/lib/initiatives/transform";
 import Header from "@/components/layout/header";
 import InitiativeKpiCards from "@/components/initiatives/initiative-kpi-cards";
 import InitiativeTable from "@/components/initiatives/initiative-table";
+import AccountPacingCards from "@/components/initiatives/account-pacing-cards";
 import EmptyState from "@/components/ui/empty-state";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 
@@ -84,8 +89,11 @@ function InitiativesContent({
     "initiative",
   );
 
+  // 期間天數（不重複日期數），供期間預算推算
+  const days = useMemo(() => countDistinctDates(data), [data]);
+
   // 全部行銷活動列（未套帳號篩選），供帳號清單與篩選使用
-  const allRows = useMemo(() => aggregateInitiatives(data), [data]);
+  const allRows = useMemo(() => aggregateInitiatives(data, days), [data, days]);
   const accounts = useMemo(
     () => [...new Set(allRows.map((r) => r.accountName))].sort(),
     [allRows],
@@ -95,6 +103,17 @@ function InitiativesContent({
     const set = new Set(selectedAccounts);
     return allRows.filter((r) => set.has(r.accountName));
   }, [allRows, selectedAccounts]);
+
+  // 帳號層級配速摘要（卡片區用全部；KPI 尊重帳號篩選）
+  const accountSummaries = useMemo(
+    () => aggregateAccounts(data, days),
+    [data, days],
+  );
+  const filteredSummaries = useMemo(() => {
+    if (selectedAccounts.length === 0) return accountSummaries;
+    const set = new Set(selectedAccounts);
+    return accountSummaries.filter((a) => set.has(a.accountName));
+  }, [accountSummaries, selectedAccounts]);
 
   const header = (
     <Header
@@ -148,8 +167,13 @@ function InitiativesContent({
     <>
       {header}
       <div className="flex-1 p-4 sm:p-6 space-y-6 animate-fade-in">
-        <InitiativeKpiCards rows={rows} />
-        <InitiativeTable rows={rows} />
+        <InitiativeKpiCards rows={rows} accounts={filteredSummaries} />
+        <AccountPacingCards
+          accounts={accountSummaries}
+          selectedAccounts={selectedAccounts}
+          onAccountsChange={onAccountsChange}
+        />
+        <InitiativeTable rows={rows} accounts={accountSummaries} />
       </div>
     </>
   );
