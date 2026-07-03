@@ -1,34 +1,50 @@
 "use client";
 
 import { useMemo } from "react";
-import type { InitiativeRow } from "@/lib/initiatives/types";
+import type { InitiativeRow, AccountSummary } from "@/lib/initiatives/types";
+import { pacingLevel, PACING_TEXT } from "@/lib/initiatives/pacing";
 import { formatCurrency, formatRoas } from "@/lib/utils/format";
 import KpiCard from "@/components/dashboard/kpi-card";
 
 interface InitiativeKpiCardsProps {
   rows: InitiativeRow[];
+  accounts: AccountSummary[];
 }
 
-/** 行銷活動總覽的四張 KPI 卡：總花費 / 總預算 / 整體 ROAS / 整體 CPA */
-export default function InitiativeKpiCards({ rows }: InitiativeKpiCardsProps) {
+/** 行銷活動總覽的四張 KPI 卡：總花費 / 期間預算 / 整體 ROAS / 整體 CPA */
+export default function InitiativeKpiCards({
+  rows,
+  accounts,
+}: InitiativeKpiCardsProps) {
   const totals = useMemo(() => {
     let spend = 0;
     let revenue = 0;
     let conversions = 0;
-    let budget = 0;
     for (const r of rows) {
       spend += r.spend;
       revenue += r.revenue;
       conversions += r.conversions;
-      budget += r.budget;
     }
     return {
       spend,
-      budget,
       roas: spend > 0 ? revenue / spend : 0,
       cpa: conversions > 0 ? spend / conversions : 0,
     };
   }, [rows]);
+
+  // 期間預算與整體達成率（帳號層級彙總）
+  const pacing = useMemo(() => {
+    let periodBudget = 0;
+    let spend = 0;
+    for (const a of accounts) {
+      periodBudget += a.periodBudget;
+      spend += a.spend;
+    }
+    return {
+      periodBudget,
+      progress: periodBudget > 0 ? spend / periodBudget : 0,
+    };
+  }, [accounts]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -53,9 +69,20 @@ export default function InitiativeKpiCards({ rows }: InitiativeKpiCardsProps) {
         }
       />
       <KpiCard
-        title="總預算"
-        value={totals.budget > 0 ? formatCurrency(totals.budget) : "—"}
+        title="期間預算"
+        value={
+          pacing.periodBudget > 0 ? formatCurrency(pacing.periodBudget) : "—"
+        }
         iconBg="bg-info/10 text-info"
+        subtitle={
+          pacing.periodBudget > 0 ? (
+            <span
+              className={`text-xs font-semibold font-mono tabular-nums ${PACING_TEXT[pacingLevel(pacing.progress)]}`}
+            >
+              達成率 {(pacing.progress * 100).toFixed(0)}%
+            </span>
+          ) : undefined
+        }
         icon={
           <svg
             className="w-5 h-5"

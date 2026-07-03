@@ -7,6 +7,7 @@ interface KpiCardProps {
   iconBg?: string;
   change?: number;
   changeLabel?: string;
+  subtitle?: ReactNode;
 }
 
 export default function KpiCard({
@@ -16,6 +17,7 @@ export default function KpiCard({
   iconBg = "bg-accent-light text-accent",
   change,
   changeLabel,
+  subtitle,
 }: KpiCardProps) {
   const isPositive = change !== undefined && change > 0;
   const isNegative = change !== undefined && change < 0;
@@ -30,6 +32,7 @@ export default function KpiCard({
           <p className="text-2xl font-bold text-foreground truncate font-mono tabular-nums">
             {value}
           </p>
+          {subtitle !== undefined && <div className="mt-2">{subtitle}</div>}
           {change !== undefined && (
             <div className="flex items-center gap-1.5 mt-2">
               <span
