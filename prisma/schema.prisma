@@ -37,6 +37,9 @@ model UserSettings {
   windsorDateRange   String  @default("last_7d")
   thresholds         Json?
   accountBudgets     Json?
+  lineChannelToken   String?
+  lineRecipientId    String?
+  linePushEnabled    Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

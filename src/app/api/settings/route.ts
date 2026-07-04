@@ -23,6 +23,9 @@ interface SettingsUpdateData {
   notionEnabled?: boolean;
   thresholds?: Prisma.InputJsonValue;
   accountBudgets?: Prisma.InputJsonValue;
+  lineChannelToken?: string | null;
+  lineRecipientId?: string | null;
+  linePushEnabled?: boolean;
 }
 
 /** PATCH 請求的 Zod 驗證 schema */
@@ -38,6 +41,13 @@ const settingsSchema = z
       .object({
         apiKey: z.string().max(500).optional(),
         parentPageId: z.string().max(500).optional(),
+        enabled: z.boolean().optional(),
+      })
+      .optional(),
+    line: z
+      .object({
+        channelToken: z.string().max(500).optional(),
+        recipientId: z.string().max(100).optional(),
         enabled: z.boolean().optional(),
       })
       .optional(),
@@ -64,6 +74,7 @@ export async function GET() {
           parentPageId: null,
           enabled: true,
         },
+        line: { hasLineToken: false, recipientId: null, enabled: false },
         thresholds: mergeThresholds(null),
         accountBudgets: {},
       });
@@ -87,6 +98,12 @@ export async function GET() {
         apiKey: decryptedNotionKey ? maskApiKey(decryptedNotionKey) : null,
         parentPageId: settings.notionParentPageId,
         enabled: settings.notionEnabled,
+      },
+      // 只回是否已設定的布林，絕不回傳 token 值（含遮罩值）
+      line: {
+        hasLineToken: !!settings.lineChannelToken,
+        recipientId: settings.lineRecipientId,
+        enabled: settings.linePushEnabled,
       },
       // 與 default 合併，前端不會因 DB 殘留舊版欄位而拿到不完整結構
       thresholds: mergeThresholds(settings.thresholds),
@@ -153,6 +170,21 @@ export async function PATCH(request: NextRequest) {
       }
       if (data.notion.enabled !== undefined) {
         updateData.notionEnabled = data.notion.enabled;
+      }
+    }
+
+    // LINE 推播設定（token 加密比照 windsorApiKey；GET 絕不回傳 token 值）
+    if (data.line) {
+      if (data.line.channelToken !== undefined) {
+        updateData.lineChannelToken = data.line.channelToken
+          ? encryptApiKey(data.line.channelToken.trim())
+          : null;
+      }
+      if (data.line.recipientId !== undefined) {
+        updateData.lineRecipientId = data.line.recipientId?.trim() || null;
+      }
+      if (data.line.enabled !== undefined) {
+        updateData.linePushEnabled = data.line.enabled;
       }
     }
 
