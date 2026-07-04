@@ -1,0 +1,1020 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>廣告花費與成效日常監控架構</title>
+    <style>
+      :root {
+        --bg: #eef1f6;
+        --paper: #ffffff;
+        --ink: #0f1419;
+        --ink-2: #1f2933;
+        --sub: #5a6573;
+        --faint: #98a2b3;
+        --line: #e7eaf0;
+        --line-2: #d8dde7;
+        --accent: #2f6bff;
+        --accent-2: #1b4fd8;
+        --accent-soft: #e9f0ff;
+        --blue: #2f6bff;
+        --blue-bg: #eaf1ff;
+        --amber: #b45309;
+        --amber-bg: #fdf1df;
+        --green: #0f9d6b;
+        --green-bg: #e6f6ee;
+        --indigo: #6366f1;
+        --card: var(--paper);
+        --canvas: var(--bg);
+        --sans:
+          "PingFang TC", "Helvetica Neue", "Segoe UI", "Noto Sans TC",
+          "Microsoft JhengHei", -apple-system, BlinkMacSystemFont, sans-serif;
+        --mono-font:
+          "SFMono-Regular", ui-monospace, "JetBrains Mono", Menlo, Consolas,
+          "Roboto Mono", monospace;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+        line-height: 1.75;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
+        font-size: 15.5px;
+      }
+      .wrap {
+        max-width: 920px;
+        margin: 40px auto;
+        background: var(--paper);
+        border: 1px solid var(--line-2);
+        box-shadow: 0 1px 2px rgba(15, 20, 25, 0.04);
+        padding: 0 72px 80px;
+        position: relative;
+        counter-reset: sec;
+      }
+      .wrap::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 0;
+        height: 3px;
+        background: var(--accent);
+        transform-origin: left;
+      }
+      header.top {
+        padding: 54px 0 28px;
+        margin: 0;
+        border-bottom: 1px solid var(--line-2);
+      }
+      header.top .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin: 0 0 16px;
+        font-family: var(--mono-font);
+        font-size: 12px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--accent);
+        font-weight: 600;
+      }
+      header.top .eyebrow::before {
+        content: "";
+        width: 7px;
+        height: 7px;
+        background: var(--accent);
+        display: inline-block;
+      }
+      header.top h1 {
+        margin: 0 0 18px;
+        font-family: var(--sans);
+        font-weight: 800;
+        font-size: 37px;
+        line-height: 1.18;
+        letter-spacing: -0.015em;
+        color: var(--ink);
+      }
+      header.top .meta {
+        font-family: var(--mono-font);
+        font-size: 12.5px;
+        color: var(--sub);
+        line-height: 1.95;
+      }
+      header.top .meta code {
+        font-family: var(--mono-font);
+        color: var(--accent-2);
+        background: var(--accent-soft);
+        padding: 1px 6px;
+        border-radius: 4px;
+      }
+      .pdf-btn {
+        position: fixed;
+        top: 22px;
+        right: 22px;
+        z-index: 50;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        font-family: var(--sans);
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        color: #fff;
+        background: var(--ink);
+        border: 1px solid var(--ink);
+        border-radius: 7px;
+        padding: 9px 16px;
+        cursor: pointer;
+        box-shadow: 0 4px 14px -6px rgba(15, 20, 25, 0.5);
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          transform 0.15s;
+      }
+      .pdf-btn:hover {
+        background: var(--accent);
+        border-color: var(--accent);
+        transform: translateY(-1px);
+      }
+      .pdf-btn:active {
+        transform: translateY(0);
+      }
+      .pdf-btn svg {
+        display: block;
+      }
+      .src-note {
+        background: #f3f6fb;
+        border-left: 3px solid var(--accent);
+        border-radius: 0 4px 4px 0;
+        padding: 15px 20px;
+        margin: 24px 0 8px;
+        font-size: 13.5px;
+        line-height: 1.85;
+        color: var(--sub);
+      }
+      .src-note b {
+        color: var(--accent-2);
+        font-weight: 700;
+      }
+      nav.toc {
+        background: transparent;
+        border-top: 1px solid var(--line-2);
+        border-bottom: 1px solid var(--line-2);
+        padding: 22px 0;
+        margin: 30px 0 4px;
+      }
+      nav.toc strong {
+        display: block;
+        margin-bottom: 16px;
+        color: var(--accent);
+        font-family: var(--mono-font);
+        font-size: 11.5px;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+      }
+      nav.toc .toc-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 2px 18px;
+      }
+      nav.toc a {
+        display: flex;
+        align-items: baseline;
+        gap: 10px;
+        color: var(--ink-2);
+        text-decoration: none;
+        font-size: 14px;
+        padding: 7px 0;
+        border-bottom: 1px solid transparent;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
+      }
+      nav.toc a:hover {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+      }
+      nav.toc a .n {
+        flex: none;
+        font-family: var(--mono-font);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+      }
+      section {
+        counter-increment: sec;
+        background: transparent;
+        border: none;
+        border-top: 1px solid var(--line);
+        border-radius: 0;
+        padding: 44px 0 0;
+        margin: 0;
+      }
+      section:first-of-type {
+        border-top: none;
+        padding-top: 34px;
+      }
+      h2 {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        font-family: var(--sans);
+        font-weight: 800;
+        font-size: 23px;
+        line-height: 1.25;
+        letter-spacing: -0.015em;
+        margin: 0 0 20px;
+        color: var(--ink);
+      }
+      h2::before {
+        content: counter(sec, decimal-leading-zero);
+        font-family: var(--mono-font);
+        font-size: 13px;
+        font-weight: 700;
+        color: var(--accent-2);
+        background: var(--accent-soft);
+        padding: 3px 8px;
+        border-radius: 5px;
+        letter-spacing: 0.02em;
+        font-variant-numeric: tabular-nums;
+      }
+      h2 .tag {
+        margin-left: auto;
+        align-self: center;
+        font-family: var(--mono-font);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--sub);
+        font-weight: 600;
+        white-space: nowrap;
+      }
+      h2 .tag::before {
+        content: "";
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        margin-right: 7px;
+        background: var(--accent);
+        vertical-align: middle;
+      }
+      h3 {
+        font-family: var(--sans);
+        font-weight: 700;
+        font-size: 16.5px;
+        margin: 28px 0 10px;
+        padding-left: 12px;
+        border-left: 3px solid var(--accent);
+        color: var(--ink);
+      }
+      h3:first-of-type {
+        margin-top: 8px;
+      }
+      p {
+        margin: 10px 0;
+      }
+      .lead {
+        font-size: 16.5px;
+        color: var(--ink-2);
+      }
+      #conclusion .lead {
+        background: var(--accent-soft);
+        border-left: 3px solid var(--accent);
+        border-radius: 0 5px 5px 0;
+        padding: 16px 20px;
+        color: var(--ink-2);
+      }
+      .callout {
+        background: #f5f7fa;
+        border-left: 3px solid var(--faint);
+        border-radius: 0 4px 4px 0;
+        padding: 15px 20px;
+        margin: 18px 0;
+        font-size: 14.5px;
+      }
+      .callout.blue {
+        background: var(--blue-bg);
+        border-left-color: var(--blue);
+      }
+      .callout.amber {
+        background: var(--amber-bg);
+        border-left-color: var(--amber);
+        color: #6b4410;
+      }
+      .callout.green {
+        background: var(--green-bg);
+        border-left-color: var(--green);
+      }
+      .callout b {
+        color: inherit;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 18px 0;
+        font-size: 14px;
+      }
+      th,
+      td {
+        padding: 11px 16px 11px 0;
+        border: none;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+      thead th {
+        font-family: var(--mono-font);
+        color: var(--ink);
+        font-weight: 700;
+        font-size: 11.5px;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        white-space: nowrap;
+        border-bottom: 2px solid var(--ink);
+      }
+      tbody tr:last-child td {
+        border-bottom: none;
+      }
+      tbody tr:hover {
+        background: #f5f8ff;
+      }
+      td.num {
+        width: 30px;
+        text-align: left;
+        font-family: var(--mono-font);
+        font-weight: 700;
+        color: var(--accent);
+        font-variant-numeric: tabular-nums;
+      }
+      .pin {
+        display: inline-block;
+        font-family: var(--mono-font);
+        font-size: 11.5px;
+        padding: 2px 8px;
+        border-radius: 4px;
+        background: var(--accent-soft);
+        color: var(--accent-2);
+        border: 1px solid #cddcff;
+        font-weight: 600;
+      }
+      ul.check {
+        list-style: none;
+        padding: 0;
+        margin: 10px 0;
+      }
+      ul.check li {
+        padding: 9px 0 9px 28px;
+        position: relative;
+        border-bottom: 1px solid var(--line);
+        font-size: 14.5px;
+      }
+      ul.check li:last-child {
+        border-bottom: none;
+      }
+      ul.check li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        top: 9px;
+        color: var(--accent);
+        font-size: 14px;
+        font-weight: 700;
+        line-height: 1.5;
+      }
+      .setting-list {
+        margin: 10px 0;
+        padding-left: 0;
+        list-style: none;
+      }
+      .setting-list li {
+        padding: 9px 0;
+        border-bottom: 1px solid var(--line);
+        font-size: 14.5px;
+      }
+      .setting-list li:last-child {
+        border-bottom: none;
+      }
+      .setting-list b {
+        color: var(--ink);
+      }
+      .grp-badge {
+        font-family: var(--mono-font);
+        font-size: 11px;
+        letter-spacing: 0.03em;
+        color: #fff;
+        border-radius: 4px;
+        padding: 3px 9px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+      .gA {
+        background: var(--blue);
+      }
+      .gB {
+        background: var(--indigo);
+      }
+      .gE {
+        background: var(--amber);
+      }
+      footer {
+        text-align: left;
+        font-family: var(--mono-font);
+        color: var(--sub);
+        font-size: 11.5px;
+        letter-spacing: 0.02em;
+        margin-top: 48px;
+        padding-top: 22px;
+        border-top: 2px solid var(--ink);
+        line-height: 1.9;
+      }
+      footer code {
+        color: var(--accent-2);
+      }
+      .mm {
+        margin: 14px 0 8px;
+        overflow-x: auto;
+      }
+      .mm ul {
+        list-style: none;
+        margin: 0;
+        padding-left: 30px;
+        position: relative;
+      }
+      .mm > ul.mm-root {
+        padding-left: 0;
+      }
+      .mm li {
+        position: relative;
+        padding: 5px 0;
+      }
+      .mm ul li::before {
+        content: "";
+        position: absolute;
+        left: -16px;
+        top: 0;
+        width: 2px;
+        height: 100%;
+        background: #d3d9e4;
+      }
+      .mm ul li:last-child::before {
+        height: 22px;
+      }
+      .mm ul li::after {
+        content: "";
+        position: absolute;
+        left: -16px;
+        top: 22px;
+        width: 16px;
+        height: 2px;
+        background: #d3d9e4;
+      }
+      .mm > ul.mm-root > li::before,
+      .mm > ul.mm-root > li::after {
+        display: none;
+      }
+      .mm .node {
+        display: inline-block;
+        background: var(--paper);
+        border: 1px solid var(--line-2);
+        border-radius: 6px;
+        padding: 7px 12px;
+        font-size: 13.5px;
+        line-height: 1.5;
+        vertical-align: top;
+      }
+      .mm .node b {
+        font-family: var(--sans);
+        font-weight: 700;
+        color: var(--ink);
+      }
+      .mm .node .kw {
+        color: var(--ink);
+        font-weight: 600;
+      }
+      .mm .node .meta {
+        font-family: var(--mono-font);
+        color: var(--sub);
+        font-size: 11.5px;
+      }
+      .mm .node.root {
+        background: var(--ink);
+        border-color: var(--ink);
+        color: #fff;
+        font-family: var(--sans);
+        font-weight: 700;
+        font-size: 14px;
+      }
+      .mm .node.cA {
+        border-left: 4px solid var(--blue);
+      }
+      .mm .node.cB {
+        border-left: 4px solid var(--indigo);
+      }
+      .mm .node.cE {
+        border-left: 4px dashed var(--amber);
+        background: var(--amber-bg);
+      }
+      .mm .node.leaf {
+        background: #f5f7fa;
+      }
+      @media screen and (prefers-reduced-motion: no-preference) {
+        .wrap::before {
+          animation: barIn 0.6s ease-out both;
+        }
+        header.top {
+          animation: riseIn 0.5s ease-out both;
+        }
+        section {
+          animation: riseIn 0.55s ease-out both;
+        }
+        section:nth-of-type(2) {
+          animation-delay: 0.05s;
+        }
+        section:nth-of-type(3) {
+          animation-delay: 0.1s;
+        }
+        section:nth-of-type(4) {
+          animation-delay: 0.15s;
+        }
+        section:nth-of-type(5) {
+          animation-delay: 0.2s;
+        }
+        section:nth-of-type(6) {
+          animation-delay: 0.25s;
+        }
+      }
+      @keyframes riseIn {
+        from {
+          opacity: 0;
+          transform: translateY(12px);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes barIn {
+        from {
+          transform: scaleX(0);
+        }
+        to {
+          transform: scaleX(1);
+        }
+      }
+      @media print {
+        .no-print {
+          display: none !important;
+        }
+        body {
+          background: #fff;
+          background-image: none;
+          font-size: 11.5pt;
+        }
+        .wrap {
+          max-width: 100%;
+          margin: 0;
+          padding: 0;
+          border: none;
+          box-shadow: none;
+        }
+        .wrap::before {
+          display: none;
+        }
+        nav.toc {
+          display: none;
+        }
+        section {
+          border-top: 1px solid #ccc;
+          padding-top: 22px;
+        }
+        section:first-of-type {
+          border-top: none;
+        }
+        h2,
+        h3 {
+          break-after: avoid;
+        }
+        table,
+        .callout,
+        .mm {
+          break-inside: avoid;
+        }
+        header.top {
+          border-bottom: 2px solid #000;
+          padding-top: 0;
+        }
+        a {
+          color: inherit;
+        }
+        .mm {
+          overflow: visible;
+        }
+      }
+      @media (max-width: 680px) {
+        .wrap {
+          max-width: 100%;
+          margin: 0;
+          padding: 0 22px 60px;
+          border: none;
+        }
+        header.top h1 {
+          font-size: 27px;
+        }
+        h2 {
+          font-size: 21px;
+        }
+        nav.toc .toc-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        th,
+        td {
+          padding: 9px 8px 9px 0;
+          font-size: 13px;
+        }
+        .pdf-btn {
+          top: auto;
+          bottom: 16px;
+          right: 16px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <button
+      class="pdf-btn no-print"
+      onclick="window.print()"
+      title="匯出 PDF（列印 → 另存為 PDF）"
+      aria-label="匯出 PDF"
+    >
+      <svg
+        width="15"
+        height="15"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+      >
+        <path d="M12 3v12" />
+        <path d="M7 11l5 5 5-5" />
+        <path d="M5 21h14" />
+      </svg>
+      匯出 PDF
+    </button>
+
+    <div class="wrap">
+      <header class="top">
+        <p class="eyebrow">Ad Manager Pro · 系統架構規劃</p>
+        <h1>廣告花費與成效<br />日常監控架構</h1>
+        <div class="meta">
+          範圍：每日監控節奏 × LINE/Email 通知 × 手機快速查看 × Cloudflare
+          部署<br />
+          依 <code>ad-manager-pro</code> 現有程式盤點 + 架構選項評估<br />
+          連線模式（repo 實地盤點）　·　產出日 2026-07-04
+        </div>
+      </header>
+
+      <div class="src-note">
+        <b>資料來源狀態：</b>系統資產為 repo 實地盤點（非假設）；LINE
+        官方帳號免費額度以台灣 2025
+        年方案為準，正式開通前建議再確認當期方案；Cloudflare 免費額度以 Workers
+        Free Plan 現行條款為準。
+      </div>
+
+      <nav class="toc">
+        <strong>目錄</strong>
+        <div class="toc-grid">
+          <a href="#conclusion"><span class="n">01</span>核心結論</a>
+          <a href="#assets"><span class="n">02</span>現況盤點</a>
+          <a href="#cadence"><span class="n">03</span>日常監控節奏</a>
+          <a href="#channels"><span class="n">04</span>通知管道</a>
+          <a href="#mobile"><span class="n">05</span>手機快速查看</a>
+          <a href="#deploy"><span class="n">06</span>Cloudflare 部署選項</a>
+          <a href="#actions"><span class="n">07</span>Action Items</a>
+        </div>
+      </nav>
+
+      <section id="conclusion">
+        <h2>核心結論 <span class="tag">摘要</span></h2>
+        <p class="lead">
+          系統已完成
+          80%——異常規則引擎、分析引擎、預算配速頁都已上線，缺口只有「排程主動檢查＋推播到你眼前」這一層。建議主
+          app 留在 Zeabur，加一個 Cloudflare Worker 當監控哨兵，每天定時檢查並推
+          LINE 摘要。
+        </p>
+        <div class="callout green">
+          <b>結論</b>：走「選項 A：Zeabur 主 app ＋ Cloudflare Worker
+          哨兵」。改動最小、風險最低、一個下午可上線，同時滿足 Cloudflare
+          的需求。通知管道已定案用 LINE（Messaging API）。
+        </div>
+        <div class="callout blue">
+          <b>判斷</b>：每天推播只放「要不要行動」的訊號（3-5
+          個數字＋紅黃綠），細節留在網頁。推播塞滿數據，三天後就不會再看了——推播是門鈴，網頁是門。
+        </div>
+        <div class="callout amber">
+          <b>警告</b>：LINE Notify 已於 2025 年 3
+          月底終止服務，網路上大量舊教學已失效。要走 LINE 只能用 Messaging
+          API（官方帳號 push），免費額度 200 則/月，推給自己綽綽有餘。
+        </div>
+      </section>
+
+      <section id="assets">
+        <h2>現況盤點 <span class="tag">已有資產</span></h2>
+        <p>以下都已存在於 repo 並有測試覆蓋，監控系統不必從零蓋：</p>
+        <ul class="check">
+          <li>
+            <b>異常規則引擎</b>：AlertRule／AlertNotification 資料表 ＋
+            <code>/api/alerts/check</code>（可自訂指標、閾值、變化率條件）
+          </li>
+          <li>
+            <b>分析引擎</b
+            >：預算異常、素材疲勞、成效判讀（<code>src/lib/analysis/</code>）
+          </li>
+          <li>
+            <b>預算配速頁</b>：/initiatives 帳號卡雙向三色配速 ＋
+            手動月預算（2026-07-03 剛上線）
+          </li>
+          <li>
+            <b>應用內通知</b>：通知鈴鐺 ＋ 瀏覽器推播（Web Notifications）
+          </li>
+          <li>
+            <b>排程基礎</b>：<code>src/lib/cron/</code> 已有
+            scheduler／job-executor（目前服務 Notion 同步）
+          </li>
+        </ul>
+        <div class="callout blue">
+          <b>缺口</b
+          >：通知只在打開網頁時才看得到。沒有伺服器端排程主動跑檢查，也沒有把結果送出
+          app 之外（LINE／Email）。
+        </div>
+      </section>
+
+      <section id="cadence">
+        <h2>日常監控節奏 <span class="tag">顧問視角</span></h2>
+        <table>
+          <thead>
+            <tr>
+              <th>頻率</th>
+              <th>看什麼</th>
+              <th>透過什麼</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>每天早上 3 秒</b></td>
+              <td>昨日花費 vs 配速%、整體 ROAS/CPA、有無異常觸發</td>
+              <td>LINE 推播摘要卡（紅黃綠）</td>
+            </tr>
+            <tr>
+              <td><b>異常即時</b></td>
+              <td>花費暴衝、ROAS 跌破閾值、CPA 超標</td>
+              <td>盤中每 4 小時 Worker 檢查 → LINE 警報</td>
+            </tr>
+            <tr>
+              <td><b>每週 10 分鐘</b></td>
+              <td>素材疲勞、各帳號趨勢、預算重分配</td>
+              <td>打開 /initiatives（後續可加 Email 週報）</td>
+            </tr>
+            <tr>
+              <td><b>每月</b></td>
+              <td>帳號診斷、策略調整</td>
+              <td>現有分析引擎產報告</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section id="channels">
+        <h2>通知管道 <span class="tag">已定案：LINE</span></h2>
+        <table>
+          <thead>
+            <tr>
+              <th>管道</th>
+              <th>費用</th>
+              <th>適合</th>
+              <th>注意</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="pin">✓ 採用</span> <b>LINE Messaging API</b></td>
+              <td>免費 200 則/月<br />（日報＋警報約用 40-60 則）</td>
+              <td>每日摘要、即時警報</td>
+              <td>
+                需開 LINE Developers ＋ 官方帳號；Flex Message 可做紅黃綠摘要卡
+              </td>
+            </tr>
+            <tr>
+              <td>Email（Resend）</td>
+              <td>免費 100 封/天</td>
+              <td>含完整表格的週報</td>
+              <td>暫不啟用，之後要加週報再開（需驗證 liweisia.com 網域）</td>
+            </tr>
+            <tr>
+              <td>Telegram Bot</td>
+              <td>完全免費無上限</td>
+              <td>備援</td>
+              <td>生態不合，不採用</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout amber">
+          <b>再提醒一次</b>：LINE Notify 已停服（2025-03-31），任何教你用
+          <code>notify-api.line.me</code> 的文章都過期了。正確路徑：LINE
+          Developers 建 Messaging API channel → 拿 channel access token →
+          用官方帳號 push 給自己的 userId。
+        </div>
+      </section>
+
+      <section id="mobile">
+        <h2>手機快速查看 <span class="tag">3 秒掃完</span></h2>
+        <ul class="setting-list">
+          <li>
+            <b>1. PWA</b>：現有 app 加 manifest ＋ icon（約 30
+            行），手機「加入主畫面」後像原生 app 一鍵開啟
+          </li>
+          <li>
+            <b>2. /daily 行動摘要頁</b
+            >：一頁塞今日花費、配速%、ROAS、異常清單，為手機單手瀏覽設計
+          </li>
+          <li>
+            <b>3. 推播帶連結</b>：LINE 訊息尾端帶 /daily 連結，點了直接進摘要頁
+          </li>
+        </ul>
+      </section>
+
+      <section id="deploy">
+        <h2>Cloudflare 部署選項 <span class="tag">三選一</span></h2>
+
+        <h3>架構圖（選項 A，建議）</h3>
+        <div class="mm">
+          <ul class="mm-root">
+            <li>
+              <span class="node root">監控系統</span>
+              <ul>
+                <li>
+                  <span class="node cA">
+                    <b>Cloudflare Worker 哨兵</b><br />
+                    <span class="meta"
+                      >Cron Triggers：每天 08:30 ＋ 盤中每 4h</span
+                    >
+                  </span>
+                  <ul>
+                    <li>
+                      <span class="node leaf">
+                        <span class="kw">打 app API</span><br />
+                        <span class="meta"
+                          >/api/alerts/check ＋ /api/digest/daily（CRON_SECRET
+                          驗證）</span
+                        >
+                      </span>
+                    </li>
+                    <li>
+                      <span class="node leaf">
+                        <span class="kw">推 LINE</span><br />
+                        <span class="meta"
+                          >Messaging API push · Flex Message 紅黃綠摘要卡</span
+                        >
+                      </span>
+                    </li>
+                  </ul>
+                </li>
+                <li>
+                  <span class="node cB">
+                    <b>Zeabur 主 app（不動）</b><br />
+                    <span class="meta"
+                      >Next.js ＋ Postgres ＋ 規則引擎 ＋ /initiatives ＋
+                      /daily</span
+                    >
+                  </span>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </div>
+
+        <h3>三選項比較</h3>
+        <table>
+          <thead>
+            <tr>
+              <th>選項</th>
+              <th>做法</th>
+              <th>優點</th>
+              <th>代價／風險</th>
+              <th>工期</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="grp-badge gA">A 建議</span></td>
+              <td>
+                Zeabur 主 app 不動，Cloudflare Worker（Cron
+                Triggers）負責排程檢查與 LINE 推播
+              </td>
+              <td>主 app 零遷移風險；Worker 約 150-200 行；免費額度綽綽有餘</td>
+              <td>多一個小服務要管</td>
+              <td>一個下午</td>
+            </tr>
+            <tr>
+              <td><span class="grp-badge gB">B</span></td>
+              <td>
+                全站搬 Cloudflare：OpenNext adapter ＋ Hyperdrive 連外部
+                Postgres
+              </td>
+              <td>平台統一、全球 edge</td>
+              <td>
+                Next 16 ＋ Prisma 7 在 Workers 上屬前緣組合，AES-256-GCM
+                加密、pg adapter 相容性要逐一驗證；DB 仍在外部
+              </td>
+              <td>2-4 天＋踩坑風險</td>
+            </tr>
+            <tr>
+              <td><span class="grp-badge gE">C</span></td>
+              <td>GitHub Actions 排程打現有 API，先驗證日報內容價值</td>
+              <td>半天搞定、零新基建</td>
+              <td>沒用到 Cloudflare；Actions 排程尖峰可延遲 3-15 分鐘</td>
+              <td>半天</td>
+            </tr>
+          </tbody>
+        </table>
+        <div class="callout green">
+          <b>建議</b>：走 A。除非本來就想離開 Zeabur，否則 B 的投報比低；C
+          適合當 A 之前的快速驗證，但 A 本身已經夠快，不必多此一舉。
+        </div>
+      </section>
+
+      <section id="actions">
+        <h2>Action Items <span class="tag">負責人／截止日</span></h2>
+        <table>
+          <thead>
+            <tr>
+              <th class="num">#</th>
+              <th>項目</th>
+              <th>負責人</th>
+              <th>截止</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="num">1</td>
+              <td>
+                開 LINE Developers ＋ Messaging API channel，取得 channel access
+                token 與自己的 userId（需要你的 LINE 帳號授權，我無法代辦）
+              </td>
+              <td>Liwei</td>
+              <td>開工前</td>
+            </tr>
+            <tr>
+              <td class="num">2</td>
+              <td>
+                app 新增 <code>/api/digest/daily</code> 摘要端點 ＋ CRON_SECRET
+                驗證機制
+              </td>
+              <td>Claude Code</td>
+              <td>開工後 D1</td>
+            </tr>
+            <tr>
+              <td class="num">3</td>
+              <td>
+                Cloudflare Worker：Cron Triggers（08:30 ＋ 每 4h）→ 打 API → 組
+                LINE Flex Message → push；<code>wrangler deploy</code>
+              </td>
+              <td>Claude Code</td>
+              <td>開工後 D1</td>
+            </tr>
+            <tr>
+              <td class="num">4</td>
+              <td>PWA manifest ＋ /daily 行動摘要頁</td>
+              <td>Claude Code</td>
+              <td>開工後 D2</td>
+            </tr>
+            <tr>
+              <td class="num">5</td>
+              <td>
+                （可選，之後）Resend Email 週報：註冊＋驗證 liweisia.com 網域
+              </td>
+              <td>Liwei</td>
+              <td>待定</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer>
+        Ad Manager Pro 監控架構規劃　·　2026-07-04　·　<code>claude-code</code>
+        產出，repo 實地盤點
+      </footer>
+    </div>
+  </body>
+</html>
