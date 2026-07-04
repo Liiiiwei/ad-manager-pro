@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- 靛色圓角底（對齊 accent #4f46e5） -->
-  <rect width="512" height="512" rx="96" fill="#4f46e5"/>
+  <!-- 靛色滿版底（對齊 accent #4f46e5）；maskable icon 需畫布四角不透明，圓角由 OS 遮罩套用，不可在 SVG 內自帶 -->
+  <rect width="512" height="512" fill="#4f46e5"/>
   <!-- 三支白色長條：由低到高的 bar chart -->
   <rect x="112" y="256" width="64" height="144" rx="16" fill="#ffffff"/>
   <rect x="224" y="176" width="64" height="224" rx="16" fill="#ffffff"/>
