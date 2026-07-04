@@ -13,6 +13,9 @@ export type { WindsorSectionProps } from "./windsor-section";
 export { NotionSection } from "./notion-section";
 export type { NotionSectionProps } from "./notion-section";
 
+export { LineSection } from "./line-section";
+export type { LineSectionProps } from "./line-section";
+
 export { ScheduleSection } from "./schedule-section";
 export type { ScheduleSectionProps } from "./schedule-section";
 

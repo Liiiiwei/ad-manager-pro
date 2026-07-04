@@ -6,6 +6,7 @@ import type { AnalysisThresholds } from "@/lib/analysis/types";
 import {
   WindsorSection,
   NotionSection,
+  LineSection,
   ScheduleSection,
   ThresholdSection,
 } from "@/components/settings";
@@ -22,6 +23,13 @@ export default function SettingsPage() {
   const [notionEnabled, setNotionEnabled] = useState(true);
   const [hasNotionConfig, setHasNotionConfig] = useState(false);
   const [showNotionKey, setShowNotionKey] = useState(false);
+
+  // LINE 推播設定
+  const [lineToken, setLineToken] = useState("");
+  const [lineRecipientId, setLineRecipientId] = useState("");
+  const [lineEnabled, setLineEnabled] = useState(false);
+  const [hasLineToken, setHasLineToken] = useState(false);
+  const [showLineToken, setShowLineToken] = useState(false);
 
   // 排程設定
   const [cronExpression, setCronExpression] = useState("0 9 * * *");
@@ -59,6 +67,12 @@ export default function SettingsPage() {
           setHasNotionConfig(data.notion.configured);
           setNotionParentPageId(data.notion.parentPageId || "");
           setNotionEnabled(data.notion.enabled ?? true);
+        }
+
+        if (data.line) {
+          setHasLineToken(data.line.hasLineToken);
+          setLineRecipientId(data.line.recipientId || "");
+          setLineEnabled(data.line.enabled ?? false);
         }
 
         if (data.thresholds) {
@@ -116,6 +130,11 @@ export default function SettingsPage() {
               parentPageId: notionParentPageId || undefined,
               enabled: notionEnabled,
             },
+            line: {
+              channelToken: lineToken || undefined,
+              recipientId: lineRecipientId || undefined,
+              enabled: lineEnabled,
+            },
             thresholds: thresholds,
           }),
         });
@@ -155,6 +174,8 @@ export default function SettingsPage() {
 
       setWindsorApiKey("");
       setNotionApiKey("");
+      if (lineToken) setHasLineToken(true);
+      setLineToken("");
 
       setTimeout(() => setSaveStatus(null), 3000);
     } catch (error) {
@@ -211,6 +232,18 @@ export default function SettingsPage() {
           hasConfig={hasNotionConfig}
           showKey={showNotionKey}
           onToggleShowKey={() => setShowNotionKey(!showNotionKey)}
+        />
+
+        <LineSection
+          channelToken={lineToken}
+          onChannelTokenChange={setLineToken}
+          recipientId={lineRecipientId}
+          onRecipientIdChange={setLineRecipientId}
+          enabled={lineEnabled}
+          onEnabledChange={setLineEnabled}
+          hasToken={hasLineToken}
+          showToken={showLineToken}
+          onToggleShowToken={() => setShowLineToken(!showLineToken)}
         />
 
         <ScheduleSection
