@@ -123,6 +123,19 @@ describe("buildDigestFlex", () => {
 
     expect(texts.some((t) => t.includes("2 件"))).toBe(true);
   });
+
+  it("有預算待辦時顯示筆數", () => {
+    const texts = collectTexts(buildDigestFlex(makeSummary(), APP_URL, 3));
+
+    expect(texts).toContain("預算待辦");
+    expect(texts).toContain("3 筆");
+  });
+
+  it("未傳預算待辦數時預設顯示 0 筆", () => {
+    const texts = collectTexts(buildDigestFlex(makeSummary(), APP_URL));
+
+    expect(texts).toContain("0 筆");
+  });
 });
 
 describe("buildAlertFlex", () => {

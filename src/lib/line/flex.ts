@@ -135,6 +135,7 @@ function footerButton(label: string, uri: string): FlexNode {
 export function buildDigestFlex(
   summary: DailySummary,
   appUrl: string,
+  budgetActionItemCount = 0,
 ): Record<string, unknown> {
   const bodyContents: FlexNode[] = [
     { type: "text", text: "昨日花費", size: "xs", color: COLORS.muted },
@@ -203,6 +204,11 @@ export function buildDigestFlex(
       "異常",
       summary.alerts.length > 0 ? `${summary.alerts.length} 件` : "無",
       summary.alerts.length > 0 ? COLORS.danger : COLORS.success,
+    ),
+    kvRow(
+      "預算待辦",
+      `${budgetActionItemCount} 筆`,
+      budgetActionItemCount > 0 ? COLORS.danger : COLORS.success,
     ),
   );
 
