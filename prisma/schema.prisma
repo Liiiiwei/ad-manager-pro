@@ -144,7 +144,7 @@ model BudgetSnapshot {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   scope       String   // "campaign" | "account_monthly"
   platform    String   // meta / google（account_monthly 為 "manual"）
-  entityKey   String   // campaign: 正規化 campaign 名稱；account_monthly: 帳號名
+  entityKey   String   // campaign: 平台+帳戶名+正規化 campaign 名（U+001F 分隔複合鍵，避免跨帳戶同名合併）；account_monthly: 帳號名
   entityLabel String   // 顯示用名稱
   budgetType  String   // "daily" | "lifetime" | "monthly_manual"
   budgetValue Float
