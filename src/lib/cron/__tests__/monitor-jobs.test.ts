@@ -6,6 +6,7 @@ vi.mock("@/lib/db/prisma", () => ({
   prisma: {
     userSettings: { findMany: vi.fn() },
     alertRule: { findMany: vi.fn() },
+    budgetActionItem: { count: vi.fn() },
   },
 }));
 vi.mock("@/lib/windsor/client", () => ({
@@ -18,11 +19,20 @@ vi.mock("@/lib/line/client", () => ({
 vi.mock("@/lib/alerts/dedupe", () => ({
   saveNewAlertNotifications: vi.fn(),
 }));
+vi.mock("@/lib/budget/action-items", () => ({
+  syncPacingActionItems: vi.fn().mockResolvedValue(2),
+}));
+vi.mock("@/lib/budget/snapshot", async (importActual) => {
+  const actual = await importActual<typeof import("@/lib/budget/snapshot")>();
+  return { ...actual, syncCampaignSnapshots: vi.fn().mockResolvedValue(0) };
+});
 
 import { prisma } from "@/lib/db/prisma";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { pushFlex, pushText } from "@/lib/line/client";
 import { saveNewAlertNotifications } from "@/lib/alerts/dedupe";
+import { syncPacingActionItems } from "@/lib/budget/action-items";
+import { syncCampaignSnapshots } from "@/lib/budget/snapshot";
 import {
   getAppUrl,
   runDailyDigestForAllUsers,
@@ -31,10 +41,13 @@ import {
 
 const settingsFindMany = vi.mocked(prisma.userSettings.findMany);
 const ruleFindMany = vi.mocked(prisma.alertRule.findMany);
+const budgetActionItemCount = vi.mocked(prisma.budgetActionItem.count);
 const fetchWindsorMock = vi.mocked(fetchWindsor);
 const pushFlexMock = vi.mocked(pushFlex);
 const pushTextMock = vi.mocked(pushText);
 const saveMock = vi.mocked(saveNewAlertNotifications);
+const syncPacingActionItemsMock = vi.mocked(syncPacingActionItems);
+const syncCampaignSnapshotsMock = vi.mocked(syncCampaignSnapshots);
 
 /** 產生完整 UserSettings 測試列 */
 function makeSettings(overrides: Partial<UserSettings> = {}): UserSettings {
@@ -116,12 +129,18 @@ beforeEach(() => {
   pushFlexMock.mockReset();
   pushTextMock.mockReset();
   saveMock.mockReset();
+  syncPacingActionItemsMock.mockReset();
+  syncCampaignSnapshotsMock.mockReset();
+  budgetActionItemCount.mockReset();
 
   ruleFindMany.mockResolvedValue([] as never);
   fetchWindsorMock.mockResolvedValue({ data: [makeRecord()] } as never);
   pushFlexMock.mockResolvedValue({ ok: true, status: 200 });
   pushTextMock.mockResolvedValue({ ok: true, status: 200 });
   saveMock.mockResolvedValue({ newAlerts: [], notifications: [] });
+  syncPacingActionItemsMock.mockResolvedValue(2);
+  syncCampaignSnapshotsMock.mockResolvedValue(0);
+  budgetActionItemCount.mockResolvedValue(2 as never);
 });
 
 describe("getAppUrl", () => {
@@ -179,6 +198,35 @@ describe("runDailyDigestForAllUsers", () => {
     pushFlexMock.mockResolvedValue({ ok: false, status: 429, error: "limit" });
 
     await expect(runDailyDigestForAllUsers(NOW)).resolves.toBeUndefined();
+  });
+
+  it("每日摘要會跑配速檢查與快照同步", async () => {
+    // 手動月預算使「測試帳戶」的配速比例遠超過門檻（觸發 pacing overspend）
+    settingsFindMany.mockResolvedValue([
+      makeSettings({ accountBudgets: { 測試帳戶: 100 } }),
+    ] as never);
+
+    await runDailyDigestForAllUsers(NOW);
+
+    expect(syncPacingActionItemsMock).toHaveBeenCalledTimes(1);
+    expect(syncPacingActionItemsMock.mock.calls[0][0]).toBe("user-1");
+    expect(syncPacingActionItemsMock.mock.calls[0][1].length).toBeGreaterThan(
+      0,
+    );
+    expect(syncCampaignSnapshotsMock).toHaveBeenCalledTimes(1);
+    expect(syncCampaignSnapshotsMock.mock.calls[0][0]).toBe("user-1");
+    expect(budgetActionItemCount).toHaveBeenCalledWith({
+      where: { userId: "user-1", reason: "pacing_overspend", status: "open" },
+    });
+
+    const bubble = pushFlexMock.mock.calls[0][2] as {
+      body: { contents: Array<{ contents?: Array<{ text?: string }> }> };
+    };
+    const rows = bubble.body.contents;
+    const budgetRow = rows.find((row) =>
+      row.contents?.some((c) => c.text === "預算待辦"),
+    );
+    expect(budgetRow?.contents?.[1]?.text).toBe("2 筆");
   });
 });
 

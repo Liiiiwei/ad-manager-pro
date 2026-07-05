@@ -9,6 +9,12 @@ import {
 import { checkRules } from "@/lib/alerts/rule-checker";
 import { saveNewAlertNotifications } from "@/lib/alerts/dedupe";
 import { mergeAccountBudgets } from "@/lib/settings/account-budgets";
+import { detectPacingOverspend } from "@/lib/budget/pacing";
+import { syncPacingActionItems } from "@/lib/budget/action-items";
+import {
+  extractCampaignBudgets,
+  syncCampaignSnapshots,
+} from "@/lib/budget/snapshot";
 import {
   buildDailySummary,
   deriveDigestDates,
@@ -108,11 +114,23 @@ async function runDailyDigestForUser(
     alerts,
   });
 
+  // 預算閉環：配速超支偵測 → 待辦；平台預算變更 → 快照/紀錄/自動對帳
+  const violations = detectPacingOverspend(summary.accounts);
+  await syncPacingActionItems(settings.userId, violations);
+  await syncCampaignSnapshots(settings.userId, extractCampaignBudgets(records));
+  const budgetActionItemCount = await prisma.budgetActionItem.count({
+    where: {
+      userId: settings.userId,
+      reason: "pacing_overspend",
+      status: "open",
+    },
+  });
+
   const appUrl = getAppUrl();
   const altText = `每日廣告摘要 ${summary.date}`;
   let result;
   try {
-    const bubble = buildDigestFlex(summary, appUrl);
+    const bubble = buildDigestFlex(summary, appUrl, budgetActionItemCount);
     result = await pushFlex(
       creds.channelToken,
       creds.recipientId,
