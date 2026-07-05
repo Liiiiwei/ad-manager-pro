@@ -13,6 +13,11 @@ import {
   accountBudgetsSchema,
   mergeAccountBudgets,
 } from "@/lib/settings/account-budgets";
+import {
+  diffAccountBudgets,
+  logAccountBudgetChanges,
+  type AccountBudgetChange,
+} from "@/lib/budget/account-budget-log";
 
 /** 設定更新資料型別 */
 interface SettingsUpdateData {
@@ -146,6 +151,7 @@ export async function PATCH(request: NextRequest) {
     const data = parsed.data;
 
     const updateData: SettingsUpdateData = {};
+    let budgetChanges: AccountBudgetChange[] = [];
 
     // Windsor 設定
     if (data.windsor) {
@@ -198,13 +204,26 @@ export async function PATCH(request: NextRequest) {
     // 帳號手動月預算：merge 語意（只動送來的 key；null 刪除該 key）
     if (data.accountBudgets) {
       const existing = await getUserSettings(user.id);
-      updateData.accountBudgets = mergeAccountBudgets(
+      // 計算變更內容（缺口一：手動改預算留痕），留痕寫入延後到設定更新成功後執行
+      const previousBudgets = mergeAccountBudgets(existing?.accountBudgets, {});
+      const nextBudgets = mergeAccountBudgets(
         existing?.accountBudgets,
         data.accountBudgets,
-      ) as Prisma.InputJsonValue;
+      );
+      updateData.accountBudgets = nextBudgets as Prisma.InputJsonValue;
+      budgetChanges = diffAccountBudgets(previousBudgets, nextBudgets);
     }
 
     await updateUserSettings(user.id, updateData);
+
+    // 稽核留痕為次要副作用：寫入失敗只記 log，不讓使用者的預算更新失敗
+    if (budgetChanges.length > 0) {
+      try {
+        await logAccountBudgetChanges(user.id, budgetChanges);
+      } catch (logError) {
+        console.error("帳號月預算變更留痕失敗（不影響設定更新）:", logError);
+      }
+    }
 
     return NextResponse.json({
       success: true,

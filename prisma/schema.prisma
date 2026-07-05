@@ -19,6 +19,9 @@ model User {
   syncLogs       SyncLog[]
   alertRules         AlertRule[]
   alertNotifications AlertNotification[]
+  budgetSnapshots   BudgetSnapshot[]
+  budgetChangeLogs  BudgetChangeLog[]
+  budgetActionItems BudgetActionItem[]
 
   @@index([clerkId])
   @@index([email])
@@ -134,4 +137,63 @@ enum SyncStatus {
   RUNNING
   SUCCESS
   FAILED
+}
+
+/// 預算數值快照（供比對用，每 (userId,scope,entityKey,budgetType) 只留最新一筆）
+model BudgetSnapshot {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scope       String   // "campaign" | "account_monthly"
+  platform    String   // meta / google（account_monthly 為 "manual"）
+  entityKey   String   // campaign: 平台+帳戶名+正規化 campaign 名（U+001F 分隔複合鍵，避免跨帳戶同名合併）；account_monthly: 帳號名
+  entityLabel String   // 顯示用名稱
+  budgetType  String   // "daily" | "lifetime" | "monthly_manual"
+  budgetValue Float
+  capturedAt  DateTime @default(now())
+
+  @@unique([userId, scope, entityKey, budgetType])
+  @@index([userId])
+}
+
+/// 預算變更歷史（缺口一核心：誰在何時把哪個帳號/campaign 預算改成多少）
+model BudgetChangeLog {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source        String   // "platform_detected" | "manual_account_budget"
+  scope         String   // "campaign" | "account_monthly"
+  platform      String
+  entityKey     String
+  entityLabel   String
+  budgetType    String
+  previousValue Float?
+  newValue      Float
+  changePercent Float?
+  note          String?
+  detectedAt    DateTime @default(now())
+
+  @@index([userId])
+  @@index([detectedAt])
+}
+
+/// 預算待辦（閉環）
+model BudgetActionItem {
+  id                String    @id @default(cuid())
+  userId            String
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason            String    // "pacing_overspend"
+  platform          String    // all/meta/google
+  accountName       String
+  severity          String    // "warning" | "critical"
+  detail            Json      // { monthSpend, periodBudget, pacingRatio, monthlyBudget }
+  status            String    @default("open") // "open" | "resolved" | "dismissed"
+  resolvedBy        String?   // "auto_detected_change" | "manual"
+  linkedChangeLogId String?
+  createdAt         DateTime  @default(now())
+  resolvedAt        DateTime?
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }

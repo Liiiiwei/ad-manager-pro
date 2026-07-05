@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useApiKey, useWindsorData } from "@/hooks/use-windsor-data";
 import { useAccountBudgets } from "@/hooks/use-account-budgets";
@@ -87,6 +87,55 @@ function DailyContent() {
       cancelled = true;
     };
   }, []);
+
+  // 預算待辦 / 近期預算變更（載入失敗靜默，不阻塞摘要）
+  const [budgetItems, setBudgetItems] = useState<
+    {
+      id: string;
+      accountName: string;
+      severity: string;
+      detail: { pacingRatio: number; monthSpend: number; periodBudget: number };
+    }[]
+  >([]);
+  const [budgetChanges, setBudgetChanges] = useState<
+    {
+      id: string;
+      source: string;
+      entityLabel: string;
+      previousValue: number | null;
+      newValue: number;
+      detectedAt: string;
+    }[]
+  >([]);
+
+  const loadBudget = useCallback(async () => {
+    try {
+      const [itemsRes, changesRes] = await Promise.all([
+        fetch("/api/budget/action-items?status=open"),
+        fetch("/api/budget/change-log?limit=10"),
+      ]);
+      if (itemsRes.ok) setBudgetItems((await itemsRes.json()).items);
+      if (changesRes.ok) setBudgetChanges((await changesRes.json()).changes);
+    } catch {
+      // 預算待辦/變更載入失敗不阻塞頁面
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBudget();
+  }, [loadBudget]);
+
+  async function updateBudgetItem(
+    id: string,
+    status: "resolved" | "dismissed",
+  ) {
+    const res = await fetch(`/api/budget/action-items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) loadBudget();
+  }
 
   const summary = useMemo(() => {
     if (data.length === 0) return null;
@@ -235,6 +284,82 @@ function DailyContent() {
           </ul>
         )}
       </div>
+
+      {/* 預算待辦 */}
+      <div className="bg-card border border-card-border rounded-xl p-4">
+        <h2 className="font-display text-base font-semibold text-foreground mb-3">
+          預算待辦
+        </h2>
+        {budgetItems.length === 0 ? (
+          <p className="text-sm text-muted">目前沒有需要處理的預算。</p>
+        ) : (
+          <ul className="space-y-3">
+            {budgetItems.map((item) => (
+              <li
+                key={item.id}
+                className="flex items-start justify-between gap-3 rounded-lg bg-danger/10 border border-danger/20 p-3"
+              >
+                <div>
+                  <p className="text-sm font-medium text-foreground">
+                    {item.accountName}
+                    <span className="ml-2 text-danger font-mono tabular-nums">
+                      配速 {Math.round(item.detail.pacingRatio * 100)}%
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted font-mono tabular-nums">
+                    {formatCurrency(item.detail.monthSpend)} /{" "}
+                    {formatCurrency(item.detail.periodBudget)}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    onClick={() => updateBudgetItem(item.id, "resolved")}
+                    className="text-xs px-2 py-1 rounded bg-accent text-white hover:bg-accent-hover"
+                  >
+                    已處理
+                  </button>
+                  <button
+                    onClick={() => updateBudgetItem(item.id, "dismissed")}
+                    className="text-xs px-2 py-1 rounded border border-card-border text-muted hover:bg-accent-light"
+                  >
+                    忽略
+                  </button>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {/* 近期預算變更 */}
+      {budgetChanges.length > 0 && (
+        <div className="bg-card border border-card-border rounded-xl p-4">
+          <h2 className="font-display text-base font-semibold text-foreground mb-3">
+            近期預算變更
+          </h2>
+          <ul className="space-y-2">
+            {budgetChanges.map((c) => (
+              <li
+                key={c.id}
+                className="flex items-center justify-between gap-3 text-sm"
+              >
+                <span className="text-foreground truncate">
+                  <span className="text-xs text-muted mr-2">
+                    {c.source === "manual_account_budget" ? "手動" : "平台"}
+                  </span>
+                  {c.entityLabel}
+                </span>
+                <span className="font-mono tabular-nums text-muted shrink-0">
+                  {c.previousValue != null
+                    ? formatCurrency(c.previousValue)
+                    : "—"}{" "}
+                  → {formatCurrency(c.newValue)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* 快速連結 */}
       <div className="grid grid-cols-2 gap-4">
