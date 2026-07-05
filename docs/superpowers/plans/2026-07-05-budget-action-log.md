@@ -19,7 +19,7 @@
 - 新增 model 後需跑 `npx prisma db push` + `npx prisma generate`（`prisma.config.ts` 不需動）。
 - **配速待辦只在每日 08:30 摘要跑一次**，不掛盤中異常檢查（`runAnomalyCheckForUser` 用 last_14d 無預算欄位）。
 - 本期範圍（scope discipline，spec 第六節定案）：待辦 reason 只做 `pacing_overspend`；操作紀錄只記「預算數字變更」（不含暫停/開啟 campaign）；門檻固定 warning `>1.10`、critical `>1.25`；快照一天一次。
-- **已知限制（寫入註解，不在本期修）**：(1) Windsor campaign 無穩定 ID，`entityKey` 用正規化 campaign 名稱，「改名即視為新 campaign」；(2) 配速待辦不會因「帳號本月不再超支」自動關閉（例如跨月花費歸零），只透過自動對帳（偵測到平台改預算）或使用者手動 resolve/dismiss 關閉 —— 這是 spec 定案的取捨，留 Phase 2。
+- **已知限制（寫入註解，不在本期修）**：(1) Windsor campaign 無穩定 ID，`entityKey` 用「平台 + 帳戶名 + 正規化 campaign 名稱」複合鍵（2026-07-05 使用者裁決：併入帳戶名，避免跨客戶同名 campaign 合併、操作紀錄歸錯客戶），「改名即視為新 campaign」的限制仍在；(2) 配速待辦不會因「帳號本月不再超支」自動關閉（例如跨月花費歸零），只透過自動對帳（偵測到平台改預算）或使用者手動 resolve/dismiss 關閉 —— 這是 spec 定案的取捨，留 Phase 2。
 
 ---
 
@@ -62,7 +62,7 @@ model BudgetSnapshot {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   scope       String   // "campaign" | "account_monthly"
   platform    String   // meta / google（account_monthly 為 "manual"）
-  entityKey   String   // campaign: 正規化 campaign 名稱；account_monthly: 帳號名
+  entityKey   String   // campaign: 平台+帳戶名+正規化 campaign 名稱（複合鍵，避免跨帳戶同名合併）；account_monthly: 帳號名
   entityLabel String   // 顯示用名稱
   budgetType  String   // "daily" | "lifetime" | "monthly_manual"
   budgetValue Float
@@ -444,6 +444,8 @@ git commit -m "feat(budget): 配速待辦持久化與去重"
 
 ## Task 4: Campaign 預算抽取 + 快照比對（純函式）
 
+> **⚠️ 2026-07-05 使用者裁決修正（已實作後調整）：** `extractCampaignBudgets` 的分組鍵與 `entityKey` 從「只用正規化 campaign 名」改為「平台 + 帳戶名 + 正規化 campaign 名」複合鍵（分隔字元 ``）。原因：Task 4 審查抓到跨帳戶／跨平台同名 campaign 會被合併（`Math.max`），導致操作紀錄歸錯客戶。下方 Step 1/3 的原始程式碼與測試以「campaign 名 only」寫成，實際碼與測試已依本註調整（`entityKey` 為複合鍵、`entityLabel` 含帳戶名、跨帳戶同名不合併）。Task 5 複合唯一鍵 `userId_scope_entityKey_budgetType` 與此新 `entityKey` 一致。
+
 **Files:**
 - Create: `src/lib/budget/snapshot.ts`
 - Test: `src/lib/budget/__tests__/snapshot.test.ts`
@@ -541,7 +543,7 @@ import type { WindsorAdRecord } from "@/lib/windsor/types";
 
 /** 一個 campaign 的一種預算類型快照值 */
 export interface CampaignBudget {
-  /** 正規化 campaign 名稱（無穩定 ID，改名視為新 campaign — 已知限制）*/
+  /** 複合鍵：平台帳戶名正規化 campaign 名稱（2026-07-05 使用者裁決併入帳戶名，避免跨帳戶同名合併；無穩定 ID，改名視為新 campaign — 已知限制）*/
   entityKey: string;
   entityLabel: string;
   platform: string;
