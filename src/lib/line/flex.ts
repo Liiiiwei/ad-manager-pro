@@ -339,3 +339,133 @@ export function buildAlertText(
     `${appUrl}/alerts`,
   ].join("\n");
 }
+
+// ==================== 叮咚週報（純追加，上方既有函式與 private helper 一字不動）====================
+// 說明：週報 builder 放進本檔是為了複用 module-private 的 header / kvRow / footerButton；
+// WeeklySummary 以 inline import type 引用，避免更動檔案最上方的既有 import 區塊。
+
+type WeeklySummaryType =
+  import("@/lib/digest/build-weekly-summary").WeeklySummary;
+
+/** WoW 百分比格式化：null → 「—」，正值補「+」 */
+function formatWow(pct: number | null): string {
+  if (pct === null) return "—";
+  const sign = pct > 0 ? "+" : "";
+  return `${sign}${pct.toFixed(1)}%`;
+}
+
+/**
+ * WoW 顏色：依指標語意判好壞。
+ * higherIsBetter=true（ROAS、轉換）→ 上升為佳（綠）；false（CPA）→ 下降為佳。
+ * 0 或 null → 灰。花費不判好壞（呼叫端傳 muted）。
+ */
+function wowColor(pct: number | null, higherIsBetter: boolean): string {
+  if (pct === null || pct === 0) return COLORS.muted;
+  const good = higherIsBetter ? pct > 0 : pct < 0;
+  return good ? COLORS.success : COLORS.danger;
+}
+
+/** 值 + WoW 的顯示字串，例如「NT$1,000（+25.0%）」 */
+function withWow(valueStr: string, pct: number | null): string {
+  return `${valueStr}（${formatWow(pct)}）`;
+}
+
+/** 每週週報 Flex bubble */
+export function buildWeeklyFlex(
+  summary: WeeklySummaryType,
+  appUrl: string,
+): Record<string, unknown> {
+  const {
+    thisWeek,
+    lastWeek: _lastWeek,
+    wow,
+    bestCampaign,
+    worstCampaign,
+  } = summary;
+
+  const roasStr = thisWeek.roas !== null ? formatRoas(thisWeek.roas) : "—";
+  const cpaStr = thisWeek.cpa !== null ? formatCurrency(thisWeek.cpa) : "—";
+
+  const bodyContents: FlexNode[] = [
+    { type: "text", text: "本週花費", size: "xs", color: COLORS.muted },
+    {
+      type: "text",
+      text: safeText(formatCurrency(thisWeek.spend)),
+      size: "xxl",
+      weight: "bold",
+      color: COLORS.foreground,
+      margin: "xs",
+    },
+    { type: "separator", margin: "lg" },
+    // 花費不判好壞，維持前景色
+    kvRow(
+      "週花費",
+      withWow(formatCurrency(thisWeek.spend), wow.spendPct),
+      COLORS.foreground,
+    ),
+    kvRow(
+      "週 ROAS",
+      withWow(roasStr, wow.roasPct),
+      wowColor(wow.roasPct, true),
+    ),
+    kvRow("週 CPA", withWow(cpaStr, wow.cpaPct), wowColor(wow.cpaPct, false)),
+    kvRow(
+      "轉換數",
+      withWow(String(Math.round(thisWeek.conversions)), wow.convPct),
+      wowColor(wow.convPct, true),
+    ),
+    { type: "separator", margin: "lg" },
+    kvRow(
+      "最佳活動",
+      bestCampaign
+        ? `${bestCampaign.name}（${formatRoas(bestCampaign.roas)}）`
+        : "—",
+      bestCampaign ? COLORS.success : COLORS.muted,
+    ),
+    kvRow(
+      "最差活動",
+      worstCampaign
+        ? `${worstCampaign.name}（${formatRoas(worstCampaign.roas)}）`
+        : "—",
+      worstCampaign ? COLORS.danger : COLORS.muted,
+    ),
+  ];
+
+  return {
+    type: "bubble",
+    header: header(
+      "每週廣告週報",
+      `${summary.weekStart} ~ ${summary.weekEnd}`,
+      COLORS.accent,
+    ),
+    body: {
+      type: "box",
+      layout: "vertical",
+      paddingAll: "16px",
+      contents: bodyContents,
+    },
+    // 週報專屬頁尚未建立，暫連每日摘要頁（/weekly 建好後改連）
+    footer: footerButton("查看完整分析", `${appUrl}/daily`),
+  };
+}
+
+/** 每週週報純文字備援（Flex 組裝失敗時使用） */
+export function buildWeeklyText(
+  summary: WeeklySummaryType,
+  appUrl: string,
+): string {
+  const { thisWeek, wow, bestCampaign, worstCampaign } = summary;
+  const roasStr = thisWeek.roas !== null ? formatRoas(thisWeek.roas) : "—";
+  const cpaStr = thisWeek.cpa !== null ? formatCurrency(thisWeek.cpa) : "—";
+
+  return [
+    `每週廣告週報（${summary.weekStart} ~ ${summary.weekEnd}）`,
+    `週花費：${formatCurrency(thisWeek.spend)}（${formatWow(wow.spendPct)}）`,
+    `週 ROAS：${roasStr}（${formatWow(wow.roasPct)}）`,
+    `週 CPA：${cpaStr}（${formatWow(wow.cpaPct)}）`,
+    `轉換數：${Math.round(thisWeek.conversions)}（${formatWow(wow.convPct)}）`,
+    `最佳活動：${bestCampaign ? `${bestCampaign.name}（${formatRoas(bestCampaign.roas)}）` : "—"}`,
+    `最差活動：${worstCampaign ? `${worstCampaign.name}（${formatRoas(worstCampaign.roas)}）` : "—"}`,
+    `${appUrl}/daily`,
+  ].join("\n");
+}

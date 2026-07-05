@@ -40,6 +40,8 @@ model UserSettings {
   lineChannelToken   String?
   lineRecipientId    String?
   linePushEnabled    Boolean @default(false)
+  // 叮咚週報開關：獨立於日報/異常的 linePushEnabled，預設 false（寫完不會自動發，刻意的安全預設）
+  weeklyReportEnabled Boolean @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

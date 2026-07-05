@@ -51,6 +51,7 @@ function makeSettings(overrides: Partial<UserSettings> = {}): UserSettings {
     lineChannelToken: "line-token",
     lineRecipientId: "U123",
     linePushEnabled: true,
+    weeklyReportEnabled: false,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
