@@ -2,7 +2,7 @@ import type { WindsorAdRecord } from "@/lib/windsor/types";
 
 /** 一個 campaign 的一種預算類型快照值 */
 export interface CampaignBudget {
-  /** 正規化 campaign 名稱（無穩定 ID，改名視為新 campaign — 已知限制）*/
+  /** 「平台+帳戶名+campaign 名」複合鍵（無穩定 ID，改名視為新 campaign — 已知限制）*/
   entityKey: string;
   entityLabel: string;
   platform: string;
@@ -39,6 +39,18 @@ function platformOf(source: string): string {
   return source;
 }
 
+/** 單元分隔字元（Unit Separator），不會出現在真實平台/帳戶/campaign 名稱中 */
+const SEP = "";
+
+/** 組合 entityKey：平台 + 帳戶名 + campaign 名，避免跨帳戶/跨平台同名 campaign 被誤合併 */
+function makeEntityKey(
+  platform: string,
+  accountName: string,
+  campaignName: string,
+): string {
+  return [platform, accountName, campaignName].join(SEP);
+}
+
 /** 從 Windsor 記錄抽取各 campaign 的當前預算（跨日取最大，比照 transform 快照邏輯）*/
 export function extractCampaignBudgets(
   records: WindsorAdRecord[],
@@ -54,17 +66,20 @@ export function extractCampaignBudgets(
     }
   >();
   for (const r of records) {
-    const name = r.campaign?.trim() || "未命名";
-    let acc = map.get(name);
+    const platform = platformOf(r.source);
+    const accountName = r.account_name?.trim() || "未命名帳戶";
+    const campaignName = r.campaign?.trim() || "未命名";
+    const key = makeEntityKey(platform, accountName, campaignName);
+    let acc = map.get(key);
     if (!acc) {
       acc = {
-        label: name,
-        platform: platformOf(r.source),
-        accountName: r.account_name?.trim() || "未命名帳戶",
+        label: `${campaignName}（${accountName}）`,
+        platform,
+        accountName,
         daily: 0,
         lifetime: 0,
       };
-      map.set(name, acc);
+      map.set(key, acc);
     }
     acc.daily = Math.max(acc.daily, r.campaignDailyBudget || 0);
     acc.lifetime = Math.max(acc.lifetime, r.campaignLifetimeBudget || 0);
@@ -102,11 +117,11 @@ export function diffCampaignBudgets(
   current: CampaignBudget[],
 ): DetectedChange[] {
   const prevMap = new Map(
-    previous.map((p) => [`${p.entityKey}|${p.budgetType}`, p.budgetValue]),
+    previous.map((p) => [`${p.entityKey}${SEP}${p.budgetType}`, p.budgetValue]),
   );
   const changes: DetectedChange[] = [];
   for (const c of current) {
-    const key = `${c.entityKey}|${c.budgetType}`;
+    const key = `${c.entityKey}${SEP}${c.budgetType}`;
     if (!prevMap.has(key)) continue; // 首見 → baseline，不算變更
     const prev = prevMap.get(key)!;
     if (prev === c.budgetValue) continue;

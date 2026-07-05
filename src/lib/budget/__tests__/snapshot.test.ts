@@ -2,6 +2,15 @@ import { describe, it, expect } from "vitest";
 import { extractCampaignBudgets, diffCampaignBudgets } from "../snapshot";
 import type { WindsorAdRecord } from "@/lib/windsor/types";
 
+/** 測試本地重建 entityKey 組合邏輯（與 snapshot.ts 內部 makeEntityKey 一致，用單元分隔字元串接）*/
+function entityKey(
+  platform: string,
+  accountName: string,
+  campaignName: string,
+): string {
+  return [platform, accountName, campaignName].join("");
+}
+
 function rec(overrides: Partial<WindsorAdRecord>): WindsorAdRecord {
   return {
     date: "2026-07-04",
@@ -28,16 +37,17 @@ describe("extractCampaignBudgets", () => {
         campaignLifetimeBudget: 20000,
       }),
     ]);
+    const key = entityKey("meta", "魔幻主義", "夏季轉換");
     expect(out).toContainEqual(
       expect.objectContaining({
-        entityKey: "夏季轉換",
+        entityKey: key,
         budgetType: "daily",
         budgetValue: 800,
       }),
     );
     expect(out).toContainEqual(
       expect.objectContaining({
-        entityKey: "夏季轉換",
+        entityKey: key,
         budgetType: "lifetime",
         budgetValue: 20000,
       }),
@@ -56,16 +66,85 @@ describe("extractCampaignBudgets", () => {
       rec({ source: "facebook", campaignDailyBudget: 100 }),
       rec({ source: "google_ads", campaign: "搜尋", campaignDailyBudget: 200 }),
     ]);
-    expect(out.find((c) => c.entityKey === "夏季轉換")?.platform).toBe("meta");
-    expect(out.find((c) => c.entityKey === "搜尋")?.platform).toBe("google");
+    expect(
+      out.find((c) => c.entityLabel.startsWith("夏季轉換"))?.platform,
+    ).toBe("meta");
+    expect(out.find((c) => c.entityLabel.startsWith("搜尋"))?.platform).toBe(
+      "google",
+    );
+  });
+
+  it("跨帳戶同名 campaign 不合併，各自產生獨立快照", () => {
+    const out = extractCampaignBudgets([
+      rec({
+        account_name: "魔幻主義",
+        campaign: "夏季轉換",
+        campaignDailyBudget: 500,
+      }),
+      rec({
+        account_name: "另一客戶",
+        campaign: "夏季轉換",
+        campaignDailyBudget: 900,
+      }),
+    ]);
+    const dailyEntries = out.filter((c) => c.budgetType === "daily");
+    expect(dailyEntries).toHaveLength(2);
+    expect(dailyEntries).toContainEqual(
+      expect.objectContaining({
+        entityKey: entityKey("meta", "魔幻主義", "夏季轉換"),
+        accountName: "魔幻主義",
+        budgetValue: 500,
+      }),
+    );
+    expect(dailyEntries).toContainEqual(
+      expect.objectContaining({
+        entityKey: entityKey("meta", "另一客戶", "夏季轉換"),
+        accountName: "另一客戶",
+        budgetValue: 900,
+      }),
+    );
+  });
+
+  it("跨平台同名 campaign 不合併，各自產生獨立快照", () => {
+    const out = extractCampaignBudgets([
+      rec({
+        source: "facebook",
+        account_name: "魔幻主義",
+        campaign: "夏季轉換",
+        campaignDailyBudget: 300,
+      }),
+      rec({
+        source: "google_ads",
+        account_name: "魔幻主義",
+        campaign: "夏季轉換",
+        campaignDailyBudget: 700,
+      }),
+    ]);
+    const dailyEntries = out.filter((c) => c.budgetType === "daily");
+    expect(dailyEntries).toHaveLength(2);
+    expect(dailyEntries).toContainEqual(
+      expect.objectContaining({
+        entityKey: entityKey("meta", "魔幻主義", "夏季轉換"),
+        platform: "meta",
+        budgetValue: 300,
+      }),
+    );
+    expect(dailyEntries).toContainEqual(
+      expect.objectContaining({
+        entityKey: entityKey("google", "魔幻主義", "夏季轉換"),
+        platform: "google",
+        budgetValue: 700,
+      }),
+    );
   });
 });
 
 describe("diffCampaignBudgets", () => {
+  const key = entityKey("meta", "魔幻主義", "夏季轉換");
   const current = [
     {
-      entityKey: "夏季轉換",
-      entityLabel: "夏季轉換",
+      entityKey: key,
+      entityLabel: "夏季轉換（魔幻主義）",
       platform: "meta",
       accountName: "魔幻主義",
       budgetType: "daily" as const,
@@ -79,7 +158,7 @@ describe("diffCampaignBudgets", () => {
 
   it("值改變時產生一筆變更並計算變動百分比", () => {
     const changes = diffCampaignBudgets(
-      [{ entityKey: "夏季轉換", budgetType: "daily", budgetValue: 400 }],
+      [{ entityKey: key, budgetType: "daily", budgetValue: 400 }],
       current,
     );
     expect(changes).toHaveLength(1);
@@ -93,7 +172,7 @@ describe("diffCampaignBudgets", () => {
 
   it("值相同不算變更", () => {
     const changes = diffCampaignBudgets(
-      [{ entityKey: "夏季轉換", budgetType: "daily", budgetValue: 800 }],
+      [{ entityKey: key, budgetType: "daily", budgetValue: 800 }],
       current,
     );
     expect(changes).toEqual([]);
