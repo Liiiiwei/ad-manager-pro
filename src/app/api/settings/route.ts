@@ -13,6 +13,10 @@ import {
   accountBudgetsSchema,
   mergeAccountBudgets,
 } from "@/lib/settings/account-budgets";
+import {
+  diffAccountBudgets,
+  logAccountBudgetChanges,
+} from "@/lib/budget/account-budget-log";
 
 /** 設定更新資料型別 */
 interface SettingsUpdateData {
@@ -198,10 +202,17 @@ export async function PATCH(request: NextRequest) {
     // 帳號手動月預算：merge 語意（只動送來的 key；null 刪除該 key）
     if (data.accountBudgets) {
       const existing = await getUserSettings(user.id);
-      updateData.accountBudgets = mergeAccountBudgets(
+      // 記錄帳號月預算變更（缺口一：手動改預算留痕）
+      const previousBudgets = mergeAccountBudgets(existing?.accountBudgets, {});
+      const nextBudgets = mergeAccountBudgets(
         existing?.accountBudgets,
         data.accountBudgets,
-      ) as Prisma.InputJsonValue;
+      );
+      updateData.accountBudgets = nextBudgets as Prisma.InputJsonValue;
+      const budgetChanges = diffAccountBudgets(previousBudgets, nextBudgets);
+      if (budgetChanges.length > 0) {
+        await logAccountBudgetChanges(user.id, budgetChanges);
+      }
     }
 
     await updateUserSettings(user.id, updateData);
