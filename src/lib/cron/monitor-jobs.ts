@@ -115,16 +115,28 @@ async function runDailyDigestForUser(
   });
 
   // 預算閉環：配速超支偵測 → 待辦；平台預算變更 → 快照/紀錄/自動對帳
-  const violations = detectPacingOverspend(summary.accounts);
-  await syncPacingActionItems(settings.userId, violations);
-  await syncCampaignSnapshots(settings.userId, extractCampaignBudgets(records));
-  const budgetActionItemCount = await prisma.budgetActionItem.count({
-    where: {
-      userId: settings.userId,
-      reason: "pacing_overspend",
-      status: "open",
-    },
-  });
+  // 屬次要功能，失敗不應拖垮核心摘要推播 → 包 try/catch，失敗時退回 0 並記 log
+  let budgetActionItemCount = 0;
+  try {
+    const violations = detectPacingOverspend(summary.accounts);
+    await syncPacingActionItems(settings.userId, violations);
+    await syncCampaignSnapshots(
+      settings.userId,
+      extractCampaignBudgets(records),
+    );
+    budgetActionItemCount = await prisma.budgetActionItem.count({
+      where: {
+        userId: settings.userId,
+        reason: "pacing_overspend",
+        status: "open",
+      },
+    });
+  } catch (error) {
+    console.error(
+      `[monitor] 使用者 ${settings.userId} 預算閉環處理失敗，跳過（不影響核心摘要）:`,
+      error,
+    );
+  }
 
   const appUrl = getAppUrl();
   const altText = `每日廣告摘要 ${summary.date}`;

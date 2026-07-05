@@ -228,6 +228,15 @@ describe("runDailyDigestForAllUsers", () => {
     );
     expect(budgetRow?.contents?.[1]?.text).toBe("2 筆");
   });
+
+  it("預算閉環拋錯不影響核心摘要推播（錯誤隔離）", async () => {
+    settingsFindMany.mockResolvedValue([makeSettings()] as never);
+    syncPacingActionItemsMock.mockRejectedValueOnce(new Error("boom"));
+
+    await expect(runDailyDigestForAllUsers(NOW)).resolves.toBeUndefined();
+
+    expect(pushFlexMock).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("runAnomalyCheckForAllUsers", () => {
