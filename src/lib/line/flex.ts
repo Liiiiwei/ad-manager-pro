@@ -2,6 +2,8 @@ import type { DailySummary } from "@/lib/digest/build-daily-summary";
 import type { TriggeredAlert } from "@/lib/alerts/types";
 import { pacingLevel, type PacingLevel } from "@/lib/initiatives/pacing";
 import { formatCurrency, formatRoas } from "@/lib/utils/format";
+// 週報專用（分帳號 Top-N 切分）；日報不使用
+import { splitTopAccounts } from "@/lib/digest/build-weekly-summary";
 
 /**
  * LINE Flex JSON 只接受 hex 色票，無法使用 CSS token —
@@ -358,6 +360,9 @@ function platformHex(platform: string): string {
   return PLATFORM_HEX[platform] ?? COLORS.muted;
 }
 
+/** Flex 卡片最多完整渲染的帳號數；其餘收成一列彙總（純文字備援不受此限） */
+const WEEKLY_FLEX_MAX_ACCOUNTS = 5;
+
 /** WoW 百分比格式化：null → 「—」，正值補「+」 */
 function formatWow(pct: number | null): string {
   if (pct === null) return "—";
@@ -501,8 +506,23 @@ export function buildWeeklyFlex(
   ];
 
   if (accounts.length > 0) {
-    for (const account of accounts) {
+    // 帳號數多時只完整渲染前 N 個，其餘收成一列彙總避免 Flex 卡片過長
+    const { shown, restCount, restSpend } = splitTopAccounts(
+      accounts,
+      WEEKLY_FLEX_MAX_ACCOUNTS,
+    );
+    for (const account of shown) {
       bodyContents.push(...accountSection(account));
+    }
+    if (restCount > 0) {
+      bodyContents.push(
+        { type: "separator", margin: "lg" },
+        kvRow(
+          `其餘 ${restCount} 個帳號`,
+          formatCurrency(restSpend),
+          COLORS.muted,
+        ),
+      );
     }
   } else {
     bodyContents.push(

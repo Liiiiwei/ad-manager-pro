@@ -4,6 +4,8 @@ import {
   deriveWeekWindows,
   buildWeeklySummary,
   weeklyPaceBudget,
+  splitTopAccounts,
+  type AccountWeekly,
 } from "../build-weekly-summary";
 
 /** 產生完整欄位的測試記錄（同 build-daily-summary 測試風格） */
@@ -308,5 +310,65 @@ describe("buildWeeklySummary 分帳號本週表現", () => {
     const { accounts } = buildWeeklySummary(records, { now: NOW });
     expect(accounts.every((a) => a.weekProgress === null)).toBe(true);
     expect(accounts.every((a) => a.budgetSource === null)).toBe(true);
+  });
+});
+
+describe("splitTopAccounts", () => {
+  // 依序建 n 個帳號，thisWeekSpend 分別為 100, 200, ...（已排序輸入以由高到低為準，
+  // 這裡用遞增值僅為好辨識加總，不影響函式邏輯——它只切前 limit 個）
+  function makeAccounts(spends: number[]): AccountWeekly[] {
+    return spends.map((spend, i) => ({
+      accountName: `帳戶${i + 1}`,
+      platform: "Meta",
+      thisWeekSpend: spend,
+      spendWow: null,
+      weekProgress: null,
+      budgetSource: null,
+      roas: null,
+      conversions: 0,
+      cpa: null,
+      cpaWow: null,
+    }));
+  }
+
+  it("6 個帳號 → 顯示 5 + 彙總，彙總金額＝第 6 個之後加總", () => {
+    // 花費 600,500,400,300,200,100 → 前 5 個 shown、第 6 個（100）收進彙總
+    const accounts = makeAccounts([600, 500, 400, 300, 200, 100]);
+    const { shown, restCount, restSpend } = splitTopAccounts(accounts, 5);
+    expect(shown).toHaveLength(5);
+    expect(shown.map((a) => a.accountName)).toEqual([
+      "帳戶1",
+      "帳戶2",
+      "帳戶3",
+      "帳戶4",
+      "帳戶5",
+    ]);
+    expect(restCount).toBe(1);
+    expect(restSpend).toBe(100);
+  });
+
+  it("7 個帳號 → restCount=2、restSpend＝第 6、7 個加總", () => {
+    const accounts = makeAccounts([700, 600, 500, 400, 300, 200, 100]);
+    const { shown, restCount, restSpend } = splitTopAccounts(accounts, 5);
+    expect(shown).toHaveLength(5);
+    expect(restCount).toBe(2);
+    // 200 + 100
+    expect(restSpend).toBe(300);
+  });
+
+  it("剛好 5 個帳號 → 全部顯示、無彙總列", () => {
+    const accounts = makeAccounts([500, 400, 300, 200, 100]);
+    const { shown, restCount, restSpend } = splitTopAccounts(accounts, 5);
+    expect(shown).toHaveLength(5);
+    expect(restCount).toBe(0);
+    expect(restSpend).toBe(0);
+  });
+
+  it("少於 5 個帳號 → 全部顯示、無彙總列", () => {
+    const accounts = makeAccounts([300, 200, 100]);
+    const { shown, restCount, restSpend } = splitTopAccounts(accounts, 5);
+    expect(shown).toHaveLength(3);
+    expect(restCount).toBe(0);
+    expect(restSpend).toBe(0);
   });
 });

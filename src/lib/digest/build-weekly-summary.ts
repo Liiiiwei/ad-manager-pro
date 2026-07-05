@@ -279,6 +279,26 @@ function buildAccounts(
 }
 
 /**
+ * 分帳號 Top-N 切分（給 Flex 卡片控制長度用；純函式，不改動輸入）。
+ * accounts 須為已排序（依 thisWeekSpend 由高到低）。
+ * 帳號數 ≤ limit → 全部顯示、restCount=0、restSpend=0；
+ * 帳號數 > limit → 前 limit 個為 shown，其餘收成 restCount 個、restSpend = 其 thisWeekSpend 加總。
+ * 抽成獨立函式方便日後調 N。
+ */
+export function splitTopAccounts(
+  accounts: AccountWeekly[],
+  limit: number,
+): { shown: AccountWeekly[]; restCount: number; restSpend: number } {
+  if (accounts.length <= limit) {
+    return { shown: accounts, restCount: 0, restSpend: 0 };
+  }
+  const shown = accounts.slice(0, limit);
+  const rest = accounts.slice(limit);
+  const restSpend = rest.reduce((total, a) => total + a.thisWeekSpend, 0);
+  return { shown, restCount: rest.length, restSpend };
+}
+
+/**
  * 從 Windsor 記錄彙整週報（純函式）。
  * 窗口由 options.now 推導，records 內用字串日期比較切成本週/上週兩窗
  * （同日報「抓 60d 再 filter」手法，不引入新查詢參數）。
