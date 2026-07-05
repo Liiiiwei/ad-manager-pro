@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import type { WindsorAdRecord } from "@/lib/windsor/types";
-import { deriveWeekWindows, buildWeeklySummary } from "../build-weekly-summary";
+import {
+  deriveWeekWindows,
+  buildWeeklySummary,
+  weeklyPaceBudget,
+} from "../build-weekly-summary";
 
 /** 產生完整欄位的測試記錄（同 build-daily-summary 測試風格） */
 function makeRecord(overrides: Partial<WindsorAdRecord> = {}): WindsorAdRecord {
@@ -175,5 +179,134 @@ describe("buildWeeklySummary", () => {
     expect(summary.thisWeek.cpa).toBeNull();
     expect(summary.bestCampaign).toBeNull();
     expect(summary.worstCampaign).toBeNull();
+  });
+});
+
+describe("weeklyPaceBudget", () => {
+  it("月預算 × 7 ÷ 當月天數（2026-07 為 31 天）", () => {
+    // 3100 × 7 / 31 = 700
+    expect(weeklyPaceBudget(3100, NOW)).toBeCloseTo(700);
+  });
+
+  it("月預算 ≤ 0 → null（無預算不配速）", () => {
+    expect(weeklyPaceBudget(0, NOW)).toBeNull();
+    expect(weeklyPaceBudget(-100, NOW)).toBeNull();
+  });
+});
+
+describe("buildWeeklySummary 分帳號本週表現", () => {
+  // 本週窗口 06-29~07-05；上週 06-22~06-28
+  // 帳號 A（meta）：本週 spend 700 / rev 2100 / conv 35 → roas 3、cpa 20；
+  //   上週 spend 350 / conv 10 → cpa 35。月預算 3100 → 週應花 700 → 配速 100%
+  // 帳號 B（google）：本週 spend 500，無月預算 → 配速 null
+  // 帳號 C（meta）：本週 spend 1400，月預算 3100 → 週應花 700 → 配速 200%（>100%）
+  const records = [
+    makeRecord({
+      date: "2026-06-30",
+      source: "meta",
+      account_name: "帳戶A",
+      spend: 700,
+      revenue: 2100,
+      conversions: 35,
+    }),
+    makeRecord({
+      date: "2026-06-25",
+      source: "meta",
+      account_name: "帳戶A",
+      spend: 350,
+      revenue: 700,
+      conversions: 10,
+    }),
+    makeRecord({
+      date: "2026-07-01",
+      source: "google",
+      account_name: "帳戶B",
+      spend: 500,
+      revenue: 1000,
+      conversions: 20,
+    }),
+    makeRecord({
+      date: "2026-07-02",
+      source: "meta",
+      account_name: "帳戶C",
+      spend: 1400,
+      revenue: 2800,
+      conversions: 40,
+    }),
+  ];
+
+  const manualBudgets = { 帳戶A: 3100, 帳戶C: 3100 };
+
+  it("依本週花費由高到低排序（C 1400 → A 700 → B 500）", () => {
+    const { accounts } = buildWeeklySummary(records, {
+      now: NOW,
+      manualBudgets,
+    });
+    expect(accounts.map((a) => a.accountName)).toEqual([
+      "帳戶C",
+      "帳戶A",
+      "帳戶B",
+    ]);
+  });
+
+  it("多帳號聚合：各帳號本週 spend/roas/conversions/cpa 正確", () => {
+    const { accounts } = buildWeeklySummary(records, {
+      now: NOW,
+      manualBudgets,
+    });
+    const a = accounts.find((x) => x.accountName === "帳戶A")!;
+    expect(a.platform).toBe("Meta");
+    expect(a.thisWeekSpend).toBe(700);
+    expect(a.roas).toBeCloseTo(3);
+    expect(a.conversions).toBe(35);
+    expect(a.cpa).toBeCloseTo(20);
+  });
+
+  it("分帳號 WoW：花費 +100%、CPA -42.86%", () => {
+    const { accounts } = buildWeeklySummary(records, {
+      now: NOW,
+      manualBudgets,
+    });
+    const a = accounts.find((x) => x.accountName === "帳戶A")!;
+    // 花費 (700-350)/350 = +100%
+    expect(a.spendWow).toBeCloseTo(100);
+    // CPA (20-35)/35 = -42.857%
+    expect(a.cpaWow).toBeCloseTo(-42.857, 1);
+  });
+
+  it("weekProgress 有預算：帳戶A 週應花 700、花 700 → 100%，budgetSource=manual", () => {
+    const { accounts } = buildWeeklySummary(records, {
+      now: NOW,
+      manualBudgets,
+    });
+    const a = accounts.find((x) => x.accountName === "帳戶A")!;
+    expect(a.weekProgress).toBeCloseTo(1);
+    expect(a.budgetSource).toBe("manual");
+  });
+
+  it("weekProgress 無預算：帳戶B → null、budgetSource=null", () => {
+    const { accounts } = buildWeeklySummary(records, {
+      now: NOW,
+      manualBudgets,
+    });
+    const b = accounts.find((x) => x.accountName === "帳戶B")!;
+    expect(b.weekProgress).toBeNull();
+    expect(b.budgetSource).toBeNull();
+  });
+
+  it("weekProgress 超支（>100%）：帳戶C 花 1400 / 應花 700 → 200%", () => {
+    const { accounts } = buildWeeklySummary(records, {
+      now: NOW,
+      manualBudgets,
+    });
+    const c = accounts.find((x) => x.accountName === "帳戶C")!;
+    expect(c.weekProgress).toBeCloseTo(2);
+    expect(c.weekProgress! > 1).toBe(true);
+  });
+
+  it("完全省略 manualBudgets → 所有帳號 weekProgress null", () => {
+    const { accounts } = buildWeeklySummary(records, { now: NOW });
+    expect(accounts.every((a) => a.weekProgress === null)).toBe(true);
+    expect(accounts.every((a) => a.budgetSource === null)).toBe(true);
   });
 });

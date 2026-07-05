@@ -346,6 +346,17 @@ export function buildAlertText(
 
 type WeeklySummaryType =
   import("@/lib/digest/build-weekly-summary").WeeklySummary;
+type AccountWeeklyType =
+  import("@/lib/digest/build-weekly-summary").AccountWeekly;
+
+/** 平台圓點顏色（僅視覺區分，非好壞判斷） */
+const PLATFORM_HEX: Record<string, string> = {
+  Meta: COLORS.info,
+  Google: COLORS.warning,
+};
+function platformHex(platform: string): string {
+  return PLATFORM_HEX[platform] ?? COLORS.muted;
+}
 
 /** WoW 百分比格式化：null → 「—」，正值補「+」 */
 function formatWow(pct: number | null): string {
@@ -370,24 +381,109 @@ function withWow(valueStr: string, pct: number | null): string {
   return `${valueStr}（${formatWow(pct)}）`;
 }
 
-/** 每週週報 Flex bubble */
+/**
+ * 週配速進度條（僅在有預算時呼叫）。
+ * 規則：>100% 轉紅（danger），否則靛（accent）；條寬夾在 1%～100%（LINE 不接受 0%）。
+ */
+function weeklyProgressBar(progress: number): FlexNode {
+  const pct = Math.round(progress * 100);
+  const barWidth = Math.max(1, Math.min(pct, 100));
+  const color = progress > 1 ? COLORS.danger : COLORS.accent;
+  return {
+    type: "box",
+    layout: "vertical",
+    backgroundColor: COLORS.track,
+    cornerRadius: "sm",
+    height: "6px",
+    margin: "sm",
+    contents: [
+      {
+        type: "box",
+        layout: "vertical",
+        backgroundColor: color,
+        cornerRadius: "sm",
+        height: "6px",
+        width: `${barWidth}%`,
+        contents: [{ type: "filler" }],
+      },
+    ],
+  };
+}
+
+/** 單一帳號的 Flex 區塊（平台圓點＋帳號名 → 花費WoW → 配速條 → ROAS/轉換 → CPA WoW） */
+function accountSection(account: AccountWeeklyType): FlexNode[] {
+  const roasStr = account.roas !== null ? formatRoas(account.roas) : "—";
+  const cpaStr = account.cpa !== null ? formatCurrency(account.cpa) : "—";
+
+  const rows: FlexNode[] = [
+    { type: "separator", margin: "lg" },
+    // 平台圓點 + 帳號名
+    {
+      type: "box",
+      layout: "horizontal",
+      margin: "md",
+      contents: [
+        {
+          type: "box",
+          layout: "vertical",
+          width: "10px",
+          height: "10px",
+          cornerRadius: "5px",
+          backgroundColor: platformHex(account.platform),
+          flex: 0,
+          contents: [{ type: "filler" }],
+        },
+        {
+          type: "text",
+          text: safeText(account.accountName),
+          size: "sm",
+          weight: "bold",
+          color: COLORS.foreground,
+          margin: "sm",
+          flex: 1,
+          wrap: true,
+        },
+      ],
+    },
+    // 花費不判好壞，維持前景色
+    kvRow(
+      "花費",
+      withWow(formatCurrency(account.thisWeekSpend), account.spendWow),
+      COLORS.foreground,
+    ),
+  ];
+
+  // 週配速：有預算畫進度條，無預算顯示「未設定預算」不畫條
+  if (account.weekProgress !== null) {
+    const pct = Math.round(account.weekProgress * 100);
+    const color = account.weekProgress > 1 ? COLORS.danger : COLORS.accent;
+    rows.push(kvRow("週配速", `${pct}%`, color));
+    rows.push(weeklyProgressBar(account.weekProgress));
+  } else {
+    rows.push(kvRow("週配速", "未設定預算", COLORS.muted));
+  }
+
+  rows.push(
+    kvRow("ROAS｜轉換", `${roasStr}｜${Math.round(account.conversions)}`),
+    kvRow(
+      "CPA",
+      withWow(cpaStr, account.cpaWow),
+      wowColor(account.cpaWow, false),
+    ),
+  );
+
+  return rows;
+}
+
+/** 每週週報 Flex bubble（分帳號完整版） */
 export function buildWeeklyFlex(
   summary: WeeklySummaryType,
   appUrl: string,
 ): Record<string, unknown> {
-  const {
-    thisWeek,
-    lastWeek: _lastWeek,
-    wow,
-    bestCampaign,
-    worstCampaign,
-  } = summary;
-
-  const roasStr = thisWeek.roas !== null ? formatRoas(thisWeek.roas) : "—";
-  const cpaStr = thisWeek.cpa !== null ? formatCurrency(thisWeek.cpa) : "—";
+  const { thisWeek, wow, accounts } = summary;
 
   const bodyContents: FlexNode[] = [
-    { type: "text", text: "本週花費", size: "xs", color: COLORS.muted },
+    { type: "text", text: "本週總花費", size: "xs", color: COLORS.muted },
     {
       type: "text",
       text: safeText(formatCurrency(thisWeek.spend)),
@@ -396,40 +492,31 @@ export function buildWeeklyFlex(
       color: COLORS.foreground,
       margin: "xs",
     },
-    { type: "separator", margin: "lg" },
-    // 花費不判好壞，維持前景色
+    // 總花費 WoW（不判好壞，維持前景色）
     kvRow(
-      "週花費",
-      withWow(formatCurrency(thisWeek.spend), wow.spendPct),
-      COLORS.foreground,
-    ),
-    kvRow(
-      "週 ROAS",
-      withWow(roasStr, wow.roasPct),
-      wowColor(wow.roasPct, true),
-    ),
-    kvRow("週 CPA", withWow(cpaStr, wow.cpaPct), wowColor(wow.cpaPct, false)),
-    kvRow(
-      "轉換數",
-      withWow(String(Math.round(thisWeek.conversions)), wow.convPct),
-      wowColor(wow.convPct, true),
-    ),
-    { type: "separator", margin: "lg" },
-    kvRow(
-      "最佳活動",
-      bestCampaign
-        ? `${bestCampaign.name}（${formatRoas(bestCampaign.roas)}）`
-        : "—",
-      bestCampaign ? COLORS.success : COLORS.muted,
-    ),
-    kvRow(
-      "最差活動",
-      worstCampaign
-        ? `${worstCampaign.name}（${formatRoas(worstCampaign.roas)}）`
-        : "—",
-      worstCampaign ? COLORS.danger : COLORS.muted,
+      "對上週",
+      formatWow(wow.spendPct),
+      wow.spendPct === null ? COLORS.muted : COLORS.foreground,
     ),
   ];
+
+  if (accounts.length > 0) {
+    for (const account of accounts) {
+      bodyContents.push(...accountSection(account));
+    }
+  } else {
+    bodyContents.push(
+      { type: "separator", margin: "lg" },
+      {
+        type: "text",
+        text: "本週無帳號資料",
+        size: "sm",
+        color: COLORS.muted,
+        margin: "md",
+        wrap: true,
+      },
+    );
+  }
 
   return {
     type: "bubble",
@@ -449,23 +536,39 @@ export function buildWeeklyFlex(
   };
 }
 
-/** 每週週報純文字備援（Flex 組裝失敗時使用） */
+/** 每週週報純文字備援（Flex 組裝失敗時使用，分帳號逐一列出） */
 export function buildWeeklyText(
   summary: WeeklySummaryType,
   appUrl: string,
 ): string {
-  const { thisWeek, wow, bestCampaign, worstCampaign } = summary;
-  const roasStr = thisWeek.roas !== null ? formatRoas(thisWeek.roas) : "—";
-  const cpaStr = thisWeek.cpa !== null ? formatCurrency(thisWeek.cpa) : "—";
+  const { thisWeek, wow, accounts } = summary;
 
-  return [
+  const lines: string[] = [
     `每週廣告週報（${summary.weekStart} ~ ${summary.weekEnd}）`,
-    `週花費：${formatCurrency(thisWeek.spend)}（${formatWow(wow.spendPct)}）`,
-    `週 ROAS：${roasStr}（${formatWow(wow.roasPct)}）`,
-    `週 CPA：${cpaStr}（${formatWow(wow.cpaPct)}）`,
-    `轉換數：${Math.round(thisWeek.conversions)}（${formatWow(wow.convPct)}）`,
-    `最佳活動：${bestCampaign ? `${bestCampaign.name}（${formatRoas(bestCampaign.roas)}）` : "—"}`,
-    `最差活動：${worstCampaign ? `${worstCampaign.name}（${formatRoas(worstCampaign.roas)}）` : "—"}`,
-    `${appUrl}/daily`,
-  ].join("\n");
+    `本週總花費：${formatCurrency(thisWeek.spend)}（${formatWow(wow.spendPct)}）`,
+  ];
+
+  if (accounts.length === 0) {
+    lines.push("本週無帳號資料");
+  } else {
+    for (const account of accounts) {
+      const roasStr = account.roas !== null ? formatRoas(account.roas) : "—";
+      const cpaStr = account.cpa !== null ? formatCurrency(account.cpa) : "—";
+      const pace =
+        account.weekProgress !== null
+          ? `${Math.round(account.weekProgress * 100)}%`
+          : "未設定預算";
+      lines.push(
+        "",
+        `【${account.accountName}｜${account.platform}】`,
+        `花費：${formatCurrency(account.thisWeekSpend)}（${formatWow(account.spendWow)}）`,
+        `週配速：${pace}`,
+        `ROAS：${roasStr}｜轉換：${Math.round(account.conversions)}`,
+        `CPA：${cpaStr}（${formatWow(account.cpaWow)}）`,
+      );
+    }
+  }
+
+  lines.push("", `${appUrl}/daily`);
+  return lines.join("\n");
 }

@@ -4,6 +4,7 @@ import { decryptApiKey } from "@/lib/utils/crypto";
 import { fetchWindsor } from "@/lib/windsor/client";
 import { buildAdPerformanceQuery } from "@/lib/windsor/queries";
 import { buildWeeklySummary } from "@/lib/digest/build-weekly-summary";
+import { mergeAccountBudgets } from "@/lib/settings/account-budgets";
 import { pushFlex, pushText } from "@/lib/line/client";
 import { buildWeeklyFlex, buildWeeklyText } from "@/lib/line/flex";
 import { getAppUrl } from "@/lib/cron/monitor-jobs";
@@ -92,7 +93,9 @@ export async function runWeeklyReportForUser(
     return;
   }
 
-  const summary = buildWeeklySummary(records, { now });
+  // 分帳號週配速用的手動月預算（accountBudgets Json）；淨化後帶入純函式
+  const manualBudgets = mergeAccountBudgets(settings.accountBudgets, {});
+  const summary = buildWeeklySummary(records, { now, manualBudgets });
 
   const appUrl = getAppUrl();
   const altText = `每週廣告週報 ${summary.weekStart}~${summary.weekEnd}`;

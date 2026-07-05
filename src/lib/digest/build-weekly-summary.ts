@@ -68,6 +68,30 @@ export interface CampaignRank {
   cpa: number;
 }
 
+/** 單一帳號的本週表現（分帳號週報卡片一列一個） */
+export interface AccountWeekly {
+  /** 帳號名稱（= Windsor account_name，空值墊「未命名帳戶」） */
+  accountName: string;
+  /** 平台標籤（Meta / Google / 其他） */
+  platform: string;
+  /** 本週該帳號花費 */
+  thisWeekSpend: number;
+  /** 花費 WoW（%）；上週該帳號花費為 0/無 → null */
+  spendWow: number | null;
+  /** 本週配速 = 本週花費 ÷ 本週應花（0~1+）；無月預算 → null */
+  weekProgress: number | null;
+  /** 週配速預算來源；目前僅手動月預算（accountBudgets），無預算 → null */
+  budgetSource: "manual" | null;
+  /** 本週 ROAS；花費 0 → null */
+  roas: number | null;
+  /** 本週轉換數 */
+  conversions: number;
+  /** 本週 CPA；轉換 0 → null */
+  cpa: number | null;
+  /** CPA WoW（%）；上週該帳號 CPA 無 → null */
+  cpaWow: number | null;
+}
+
 /** 週報結果 */
 export interface WeeklySummary {
   /** 本週窗口起日 YYYY-MM-DD（台北） */
@@ -87,6 +111,8 @@ export interface WeeklySummary {
   bestCampaign: CampaignRank | null;
   /** 本週 spend≥門檻中 ROAS 最低的活動；無合格活動 → null */
   worstCampaign: CampaignRank | null;
+  /** 分帳號本週表現（依本週花費由高到低） */
+  accounts: AccountWeekly[];
 }
 
 /** buildWeeklySummary 選項 */
@@ -98,6 +124,12 @@ export interface WeeklySummaryOptions {
    * 預設借用分析引擎的 minSpendForDecision，不硬寫魔術常數。
    */
   minSpend?: number;
+  /**
+   * 帳號名稱 → 手動月預算（原幣別），用於算各帳號週配速。
+   * 呼叫端以 mergeAccountBudgets(settings.accountBudgets) 淨化後帶入。
+   * 省略或某帳號無值 → 該帳號 weekProgress = null（未設定預算）。
+   */
+  manualBudgets?: Record<string, number>;
 }
 
 /** 加總指定數值欄位（同 build-daily-summary 的 sum 模式） */
@@ -135,6 +167,115 @@ function wowPct(
 /** InitiativeRow → CampaignRank（活動以「帳號＋前綴」為粒度，name 取前綴） */
 function toCampaignRank(row: InitiativeRow): CampaignRank {
   return { name: row.prefix, spend: row.spend, roas: row.roas, cpa: row.cpa };
+}
+
+/**
+ * source → 平台標籤。
+ * 為維持 initiatives/transform.ts 的 platformLabel（module-private 未 export）一字不動，
+ * 這裡照抄一份等價邏輯；若日後平台分類規則變更，兩處需一起改。
+ */
+function platformLabel(source: string): string {
+  const s = (source || "").toLowerCase();
+  if (s.includes("meta") || s.includes("facebook") || s.includes("instagram")) {
+    return "Meta";
+  }
+  if (s.includes("google")) return "Google";
+  return source || "其他";
+}
+
+/**
+ * 「本週應花」= 月預算 × 7 ÷ 當月天數（當月 = date 所屬台北月份）。
+ * monthBudget ≤ 0 → null（無預算不配速）。
+ * 刻意獨立成函式：日後若要改成「月累計」等其它配速語意，只需改這裡。
+ */
+export function weeklyPaceBudget(
+  monthBudget: number,
+  date: Date,
+): number | null {
+  if (monthBudget <= 0) return null;
+  const [year, month] = taipeiDateString(date).split("-").map(Number);
+  // new Date(y, m, 0) = 該月最後一天（m 為 1-based），getDate() 得當月天數
+  const daysInMonth = new Date(year, month, 0).getDate();
+  return (monthBudget * 7) / daysInMonth;
+}
+
+/** 單一窗口內、以帳號為粒度的累加中繼 */
+interface AccountAgg {
+  accountName: string;
+  /** 該帳號任一筆記錄的 source（同帳號平台一致） */
+  source: string;
+  spend: number;
+  revenue: number;
+  conversions: number;
+}
+
+/** 把窗口內的 records 依 account_name 分組加總（空帳號名墊「未命名帳戶」，同 transform 慣例） */
+function aggregateByAccount(
+  records: WindsorAdRecord[],
+): Map<string, AccountAgg> {
+  const map = new Map<string, AccountAgg>();
+  for (const r of records) {
+    const accountName = r.account_name?.trim() || "未命名帳戶";
+    let acc = map.get(accountName);
+    if (!acc) {
+      acc = {
+        accountName,
+        source: r.source,
+        spend: 0,
+        revenue: 0,
+        conversions: 0,
+      };
+      map.set(accountName, acc);
+    }
+    acc.spend += r.spend || 0;
+    acc.revenue += r.revenue || 0;
+    acc.conversions += r.conversions || 0;
+  }
+  return map;
+}
+
+/**
+ * 組出分帳號本週表現：以「本週有資料」的帳號為主體，
+ * 對上週同名帳號取數算 WoW，並用 weeklyPaceBudget 算週配速。
+ * 依本週花費由高到低排序。
+ */
+function buildAccounts(
+  thisWeekRecords: WindsorAdRecord[],
+  lastWeekRecords: WindsorAdRecord[],
+  manualBudgets: Record<string, number>,
+  now: Date,
+): AccountWeekly[] {
+  const thisAgg = aggregateByAccount(thisWeekRecords);
+  const lastAgg = aggregateByAccount(lastWeekRecords);
+
+  const result: AccountWeekly[] = [];
+  for (const acc of thisAgg.values()) {
+    const roas = acc.spend > 0 ? acc.revenue / acc.spend : null;
+    const cpa = acc.conversions > 0 ? acc.spend / acc.conversions : null;
+
+    const last = lastAgg.get(acc.accountName);
+    const lastSpend = last?.spend ?? 0;
+    const lastCpa =
+      last && last.conversions > 0 ? last.spend / last.conversions : null;
+
+    const monthBudget = manualBudgets[acc.accountName] ?? 0;
+    const pace = weeklyPaceBudget(monthBudget, now);
+
+    result.push({
+      accountName: acc.accountName,
+      platform: platformLabel(acc.source),
+      thisWeekSpend: acc.spend,
+      spendWow: wowPct(acc.spend, lastSpend),
+      weekProgress: pace !== null ? acc.spend / pace : null,
+      budgetSource: pace !== null ? "manual" : null,
+      roas,
+      conversions: acc.conversions,
+      cpa,
+      cpaWow: wowPct(cpa, lastCpa),
+    });
+  }
+
+  return result.sort((a, b) => b.thisWeekSpend - a.thisWeekSpend);
 }
 
 /**
@@ -181,6 +322,13 @@ export function buildWeeklySummary(
     worstCampaign = toCampaignRank(worst);
   }
 
+  const accounts = buildAccounts(
+    thisWeekRecords,
+    lastWeekRecords,
+    options.manualBudgets ?? {},
+    options.now,
+  );
+
   return {
     weekStart: w.weekStart,
     weekEnd: w.weekEnd,
@@ -189,5 +337,6 @@ export function buildWeeklySummary(
     wow,
     bestCampaign,
     worstCampaign,
+    accounts,
   };
 }
