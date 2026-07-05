@@ -59,7 +59,7 @@ export function LineSection({
   return (
     <SettingsSection
       title="LINE 推播"
-      description="每日 08:30 摘要與盤中異常提醒，推送到你的 LINE"
+      description="每日 12:00 摘要與盤中異常提醒，推送到你的 LINE"
       badge={hasToken ? (enabled ? "已啟用" : "已停用") : undefined}
       badgeColor={
         enabled ? "text-success bg-success/10" : "text-muted bg-muted/10"

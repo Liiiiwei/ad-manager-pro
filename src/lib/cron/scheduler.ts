@@ -21,9 +21,9 @@ export function initCronJobs(): void {
   // 初始化動態排程系統（多租戶 SaaS）
   initDynamicScheduler();
 
-  // 每日摘要：台北時間 08:30
+  // 每日摘要：台北時間 12:00
   cron.schedule(
-    "30 8 * * *",
+    "0 12 * * *",
     () => {
       runDailyDigestForAllUsers().catch((error) => {
         console.error("[cron] 每日摘要任務失敗:", error);
@@ -62,7 +62,7 @@ export function initCronJobs(): void {
   }
 
   console.log(
-    "[cron] LINE 監控排程已啟動（每日 08:30 摘要、10/14/18/22 異常檢查、週一 09:00 週報，Asia/Taipei）",
+    "[cron] LINE 監控排程已啟動（每日 12:00 摘要、10/14/18/22 異常檢查、週一 09:00 週報，Asia/Taipei）",
   );
 
   cronInitialized = true;

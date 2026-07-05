@@ -298,7 +298,7 @@ export function buildTestFlex(appUrl: string): Record<string, unknown> {
       contents: [
         {
           type: "text",
-          text: "LINE 推播設定成功！之後每天早上 08:30 會收到前一日廣告摘要。",
+          text: "LINE 推播設定成功！之後每天中午 12:00 會收到前一日廣告摘要。",
           size: "sm",
           color: COLORS.foreground,
           wrap: true,
