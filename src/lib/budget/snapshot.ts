@@ -1,4 +1,5 @@
 import type { WindsorAdRecord } from "@/lib/windsor/types";
+import { prisma } from "@/lib/db/prisma";
 
 /** 一個 campaign 的一種預算類型快照值 */
 export interface CampaignBudget {
@@ -137,4 +138,82 @@ export function diffCampaignBudgets(
     });
   }
   return changes;
+}
+
+/**
+ * 同步 campaign 快照：偵測平台端預算變更 → 寫 changelog + 自動對帳關閉待辦 → upsert 快照。
+ * 回傳偵測到的變更筆數。
+ */
+export async function syncCampaignSnapshots(
+  userId: string,
+  current: CampaignBudget[],
+): Promise<number> {
+  const previous = await prisma.budgetSnapshot.findMany({
+    where: { userId, scope: "campaign" },
+    select: { entityKey: true, budgetType: true, budgetValue: true },
+  });
+  const changes = diffCampaignBudgets(previous, current);
+
+  for (const ch of changes) {
+    const log = await prisma.budgetChangeLog.create({
+      data: {
+        userId,
+        source: "platform_detected",
+        scope: "campaign",
+        platform: ch.platform,
+        entityKey: ch.entityKey,
+        entityLabel: ch.entityLabel,
+        budgetType: ch.budgetType,
+        previousValue: ch.previousValue,
+        newValue: ch.newValue,
+        changePercent: ch.changePercent,
+      },
+    });
+    // 自動對帳：系統偵測到平台端已調整此帳號預算，視為對應待辦已處理
+    await prisma.budgetActionItem.updateMany({
+      where: {
+        userId,
+        accountName: ch.accountName,
+        reason: "pacing_overspend",
+        status: "open",
+      },
+      data: {
+        status: "resolved",
+        resolvedBy: "auto_detected_change",
+        linkedChangeLogId: log.id,
+        resolvedAt: new Date(),
+      },
+    });
+  }
+
+  // upsert 所有當前值（含首見 baseline）為最新快照
+  for (const c of current) {
+    await prisma.budgetSnapshot.upsert({
+      where: {
+        userId_scope_entityKey_budgetType: {
+          userId,
+          scope: "campaign",
+          entityKey: c.entityKey,
+          budgetType: c.budgetType,
+        },
+      },
+      create: {
+        userId,
+        scope: "campaign",
+        platform: c.platform,
+        entityKey: c.entityKey,
+        entityLabel: c.entityLabel,
+        budgetType: c.budgetType,
+        budgetValue: c.budgetValue,
+      },
+      update: {
+        budgetValue: c.budgetValue,
+        entityLabel: c.entityLabel,
+        platform: c.platform,
+        capturedAt: new Date(),
+      },
+    });
+  }
+
+  return changes.length;
 }
