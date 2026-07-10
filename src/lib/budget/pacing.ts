@@ -19,7 +19,11 @@ export interface PacingViolation {
   monthlyBudget: number;
 }
 
-const DEFAULT_THRESHOLDS: PacingThresholds = { warning: 1.1, critical: 1.25 };
+/** 預設門檻（回正結案共用同一組 warning 門檻，避免開關判準漂移） */
+export const DEFAULT_THRESHOLDS: PacingThresholds = {
+  warning: 1.1,
+  critical: 1.25,
+};
 
 /**
  * 從帳號配速摘要偵測超支。只檢查有設「手動月預算」的帳號；
@@ -31,7 +35,11 @@ export function detectPacingOverspend(
 ): PacingViolation[] {
   const violations: PacingViolation[] = [];
   for (const a of accounts) {
-    if (a.budgetSource !== "manual" || a.monthlyBudget == null || a.periodBudget <= 0) {
+    if (
+      a.budgetSource !== "manual" ||
+      a.monthlyBudget == null ||
+      a.periodBudget <= 0
+    ) {
       continue;
     }
     const ratio = a.progress;

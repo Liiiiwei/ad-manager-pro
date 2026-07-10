@@ -26,6 +26,7 @@ function makeSummary(overrides: Partial<DailySummary> = {}): DailySummary {
     monthBudget: 100000,
     monthProgress: 0.9,
     accounts: [],
+    projection: null,
     alerts: [],
     ...overrides,
   };
@@ -124,6 +125,52 @@ describe("buildDigestFlex", () => {
     expect(texts.some((t) => t.includes("2 件"))).toBe(true);
   });
 
+  it("有月底落點預測時顯示「預估月底」與「建議日均」；超標時用 danger 色", () => {
+    const bubble = buildDigestFlex(
+      makeSummary({
+        projection: {
+          projectedEomSpend: 120000,
+          projectedRatio: 1.2,
+          suggestedDailySpend: 500,
+        },
+      }),
+      APP_URL,
+    );
+    const texts = collectTexts(bubble);
+
+    expect(texts).toContain("預估月底");
+    expect(texts.some((t) => t.includes("預算 120%"))).toBe(true);
+    expect(texts).toContain("建議日均");
+    // 超標 → 數值列用 danger 色
+    const json = JSON.stringify(bubble);
+    expect(json.includes(COLORS.danger)).toBe(true);
+  });
+
+  it("預估未超標時用 muted 色；建議日均為 null 時不顯示該列", () => {
+    const bubble = buildDigestFlex(
+      makeSummary({
+        projection: {
+          projectedEomSpend: 90000,
+          projectedRatio: 0.9,
+          suggestedDailySpend: null,
+        },
+      }),
+      APP_URL,
+    );
+    const texts = collectTexts(bubble);
+
+    expect(texts).toContain("預估月底");
+    expect(texts).not.toContain("建議日均");
+    // 未超標 → 整張 bubble 不應出現 danger 色（其餘列此情境皆為 success/muted）
+    expect(JSON.stringify(bubble).includes(COLORS.danger)).toBe(false);
+  });
+
+  it("projection 為 null（無手動月預算）時不顯示預估列", () => {
+    const texts = collectTexts(buildDigestFlex(makeSummary(), APP_URL));
+    expect(texts).not.toContain("預估月底");
+    expect(texts).not.toContain("建議日均");
+  });
+
   it("有預算待辦時顯示筆數", () => {
     const texts = collectTexts(buildDigestFlex(makeSummary(), APP_URL, 3));
 
@@ -192,6 +239,23 @@ describe("buildTestFlex / 純文字備援", () => {
     const text = buildDigestText(makeSummary(), APP_URL);
     expect(text).toContain("2026-07-03");
     expect(text).toContain("https://example.com/daily");
+  });
+
+  it("buildDigestText 有落點預測時多一行「預估月底」，無則沒有", () => {
+    const withProjection = buildDigestText(
+      makeSummary({
+        projection: {
+          projectedEomSpend: 120000,
+          projectedRatio: 1.2,
+          suggestedDailySpend: 500,
+        },
+      }),
+      APP_URL,
+    );
+    expect(withProjection).toContain("預估月底");
+    expect(withProjection).toContain("預算 120%");
+
+    expect(buildDigestText(makeSummary(), APP_URL)).not.toContain("預估月底");
   });
 
   it("buildAlertText 含件數與連結", () => {

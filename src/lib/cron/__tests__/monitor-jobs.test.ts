@@ -65,6 +65,7 @@ function makeSettings(overrides: Partial<UserSettings> = {}): UserSettings {
     lineRecipientId: "U123",
     linePushEnabled: true,
     weeklyReportEnabled: false,
+    notionDatabases: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -214,6 +215,10 @@ describe("runDailyDigestForAllUsers", () => {
     expect(syncPacingActionItemsMock.mock.calls[0][1].length).toBeGreaterThan(
       0,
     );
+    // 帶入本次觀測帳號（回正自動結案用）
+    const observed = syncPacingActionItemsMock.mock.calls[0][2];
+    expect(observed?.length).toBeGreaterThan(0);
+    expect(observed?.[0]).toHaveProperty("accountName");
     expect(syncCampaignSnapshotsMock).toHaveBeenCalledTimes(1);
     expect(syncCampaignSnapshotsMock.mock.calls[0][0]).toBe("user-1");
     expect(budgetActionItemCount).toHaveBeenCalledWith({

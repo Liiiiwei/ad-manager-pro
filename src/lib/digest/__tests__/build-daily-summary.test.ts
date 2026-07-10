@@ -153,6 +153,36 @@ describe("buildDailySummary", () => {
     expect(summary.accounts.length).toBe(2);
   });
 
+  it("有手動月預算 → projection 以手動預算帳號彙整外推", () => {
+    // 已過 3 天花 2700（日均 900）、月預算 31000、31 天
+    const records = [
+      makeRecord({ date: "2026-07-01", spend: 900 }),
+      makeRecord({ date: "2026-07-03", spend: 1800 }),
+      makeRecord({ date: "2026-07-03", spend: 50, account_name: "無預算帳戶" }),
+    ];
+
+    const summary = buildDailySummary(records, {
+      manualBudgets: { 測試帳戶: 31000 },
+      today: TODAY,
+      daysInMonth: 31,
+    });
+
+    expect(summary.projection).not.toBeNull();
+    // 900 × 31 = 27900（不含無手動預算帳戶的 50）
+    expect(summary.projection?.projectedEomSpend).toBeCloseTo(27900);
+    expect(summary.projection?.projectedRatio).toBeCloseTo(27900 / 31000);
+    // (31000 − 2700) ÷ 28 剩餘天
+    expect(summary.projection?.suggestedDailySpend).toBeCloseTo(28300 / 28);
+  });
+
+  it("無任何手動月預算 → projection 為 null", () => {
+    const summary = buildDailySummary(
+      [makeRecord({ date: "2026-07-03", campaignDailyBudget: 100 })],
+      options,
+    );
+    expect(summary.projection).toBeNull();
+  });
+
   it("alerts 選項原樣帶出，未給時為空陣列", () => {
     const summary = buildDailySummary(
       [makeRecord({ date: "2026-07-03" })],

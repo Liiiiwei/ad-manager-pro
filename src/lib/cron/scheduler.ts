@@ -5,6 +5,7 @@ import {
   runAnomalyCheckForAllUsers,
 } from "./monitor-jobs";
 import { runWeeklyReportForAllUsers } from "./weekly-jobs";
+import { runNotionDatabaseSyncForAllUsers } from "./notion-sync-job";
 
 // 使用 singleton pattern 確保只初始化一次
 let cronInitialized = false;
@@ -59,10 +60,23 @@ export function initCronJobs(): void {
       },
       { timezone: "Asia/Taipei" },
     );
+
+    // Notion database 同步：台北時間每日 12:10（在 12:00 digest 之後，
+    // 同輪產生的預算變更/待辦當天就上 Notion）。與 LINE 推播完全獨立，
+    // Notion 掛掉不影響 LINE。多副本防護同上（ENABLE_LINE_CRON）。
+    cron.schedule(
+      "10 12 * * *",
+      () => {
+        runNotionDatabaseSyncForAllUsers().catch((error) => {
+          console.error("[cron] Notion database 同步任務失敗:", error);
+        });
+      },
+      { timezone: "Asia/Taipei" },
+    );
   }
 
   console.log(
-    "[cron] LINE 監控排程已啟動（每日 12:00 摘要、10/14/18/22 異常檢查、週一 09:00 週報，Asia/Taipei）",
+    "[cron] LINE 監控排程已啟動（每日 12:00 摘要、10/14/18/22 異常檢查、週一 09:00 週報、每日 12:10 Notion 同步，Asia/Taipei）",
   );
 
   cronInitialized = true;

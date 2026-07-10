@@ -1,14 +1,19 @@
-import { prisma } from '@/lib/db/prisma';
-import { SyncLog } from '@prisma/client';
+import { prisma } from "@/lib/db/prisma";
+import { SyncLog } from "@prisma/client";
 
 /**
  * 建立同步記錄（開始）
+ * @param jobType 任務種類（預設 "page_sync"＝既有日報頁面同步；Notion database 同步用 "notion_db_sync"）
  */
-export async function createSyncLog(userId: string): Promise<SyncLog> {
+export async function createSyncLog(
+  userId: string,
+  jobType: string = "page_sync",
+): Promise<SyncLog> {
   return await prisma.syncLog.create({
     data: {
       userId,
-      status: 'RUNNING',
+      status: "RUNNING",
+      jobType,
     },
   });
 }
@@ -23,12 +28,12 @@ export async function completeSyncLog(
     adsAnalyzed: number;
     alertsDetected: number;
     overallRoas: number;
-  }
+  },
 ): Promise<SyncLog> {
   return await prisma.syncLog.update({
     where: { id: logId },
     data: {
-      status: 'SUCCESS',
+      status: "SUCCESS",
       completedAt: new Date(),
       ...data,
     },
@@ -38,11 +43,14 @@ export async function completeSyncLog(
 /**
  * 更新同步記錄（失敗）
  */
-export async function failSyncLog(logId: string, errorMessage: string): Promise<SyncLog> {
+export async function failSyncLog(
+  logId: string,
+  errorMessage: string,
+): Promise<SyncLog> {
   return await prisma.syncLog.update({
     where: { id: logId },
     data: {
-      status: 'FAILED',
+      status: "FAILED",
       completedAt: new Date(),
       errorMessage,
     },
@@ -54,11 +62,11 @@ export async function failSyncLog(logId: string, errorMessage: string): Promise<
  */
 export async function getSyncHistory(
   userId: string,
-  limit: number = 20
+  limit: number = 20,
 ): Promise<SyncLog[]> {
   return await prisma.syncLog.findMany({
     where: { userId },
-    orderBy: { startedAt: 'desc' },
+    orderBy: { startedAt: "desc" },
     take: limit,
   });
 }

@@ -237,6 +237,39 @@ function DailyContent() {
             </p>
           </div>
         </div>
+        {/* 月底落點預測（只有設定手動月預算時 projection 才存在） */}
+        {summary.projection !== null &&
+          summary.projection.projectedEomSpend !== null && (
+            <div className="grid grid-cols-2 gap-2 text-sm border-t border-card-border pt-3">
+              <div>
+                <p className="text-xs text-muted">預估月底</p>
+                <p
+                  className={`font-mono tabular-nums ${
+                    summary.projection.projectedRatio !== null &&
+                    summary.projection.projectedRatio > 1
+                      ? "text-danger"
+                      : "text-foreground"
+                  }`}
+                >
+                  {formatCurrency(summary.projection.projectedEomSpend)}
+                  {summary.projection.projectedRatio !== null && (
+                    <span className="ml-1 text-xs">
+                      （預算{" "}
+                      {Math.round(summary.projection.projectedRatio * 100)}%）
+                    </span>
+                  )}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-muted">建議日均</p>
+                <p className="font-mono tabular-nums text-foreground">
+                  {summary.projection.suggestedDailySpend !== null
+                    ? formatCurrency(summary.projection.suggestedDailySpend)
+                    : "—"}
+                </p>
+              </div>
+            </div>
+          )}
       </div>
 
       {/* 昨日 ROAS / CPA */}

@@ -2,6 +2,7 @@ import type { WindsorAdRecord } from "@/lib/windsor/types";
 import type { TriggeredAlert } from "@/lib/alerts/types";
 import { aggregateAccounts } from "@/lib/initiatives/transform";
 import type { AccountSummary } from "@/lib/initiatives/types";
+import { projectEndOfMonth, type EomProjection } from "@/lib/budget/projection";
 
 /** 以台北時區輸出 YYYY-MM-DD（sv locale 天生是 ISO 格式） */
 export function taipeiDateString(d: Date): string {
@@ -68,6 +69,8 @@ export interface DailySummary {
   monthProgress: number | null;
   /** 帳號層級配速明細（依花費由高到低） */
   accounts: AccountSummary[];
+  /** 月底落點預測（只彙整有手動月預算的帳號）；無任何手動預算 → null */
+  projection: EomProjection | null;
   /** 異常清單（options.alerts 原樣帶出） */
   alerts: TriggeredAlert[];
 }
@@ -117,6 +120,28 @@ export function buildDailySummary(
   const budgetedSpend = budgeted.reduce((total, a) => total + a.spend, 0);
   const monthProgress = monthBudget > 0 ? budgetedSpend / monthBudget : null;
 
+  // 月底落點預測：只彙整有手動月預算的帳號（API 推算預算不做落點）
+  const manualAccounts = accounts.filter(
+    (a) => a.budgetSource === "manual" && (a.monthlyBudget ?? 0) > 0,
+  );
+  const manualMonthlyBudget = manualAccounts.reduce(
+    (total, a) => total + (a.monthlyBudget ?? 0),
+    0,
+  );
+  const manualMonthSpend = manualAccounts.reduce(
+    (total, a) => total + a.spend,
+    0,
+  );
+  const projection =
+    manualMonthlyBudget > 0
+      ? projectEndOfMonth({
+          monthSpend: manualMonthSpend,
+          elapsedDays: dates.dayOfMonth,
+          daysInMonth: options.daysInMonth,
+          monthlyBudget: manualMonthlyBudget,
+        })
+      : null;
+
   return {
     date: dates.yesterday,
     yesterdaySpend,
@@ -126,6 +151,7 @@ export function buildDailySummary(
     monthBudget,
     monthProgress,
     accounts,
+    projection,
     alerts: options.alerts ?? [],
   };
 }

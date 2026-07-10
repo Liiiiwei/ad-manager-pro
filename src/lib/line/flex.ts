@@ -190,6 +190,31 @@ export function buildDigestFlex(
     bodyContents.push(kvRow("本月花費", formatCurrency(summary.monthSpend)));
   }
 
+  // 月底落點預測（只有設定手動月預算時 projection 才存在）
+  const projection = summary.projection;
+  if (projection && projection.projectedEomSpend !== null) {
+    const ratio = projection.projectedRatio;
+    const overBudget = ratio !== null && ratio > 1;
+    const ratioText =
+      ratio !== null ? `（預算 ${Math.round(ratio * 100)}%）` : "";
+    bodyContents.push(
+      kvRow(
+        "預估月底",
+        `${formatCurrency(projection.projectedEomSpend)}${ratioText}`,
+        overBudget ? COLORS.danger : COLORS.muted,
+      ),
+    );
+    if (projection.suggestedDailySpend !== null) {
+      bodyContents.push(
+        kvRow(
+          "建議日均",
+          formatCurrency(projection.suggestedDailySpend),
+          COLORS.muted,
+        ),
+      );
+    }
+  }
+
   bodyContents.push(
     { type: "separator", margin: "lg" },
     kvRow(
@@ -320,14 +345,30 @@ export function buildDigestText(summary: DailySummary, appUrl: string): string {
       ? `${Math.round(summary.monthProgress * 100)}%`
       : "未設定預算";
 
-  return [
+  const lines = [
     `每日廣告摘要（${summary.date}）`,
     `昨日花費：${formatCurrency(summary.yesterdaySpend)}`,
     `昨日 ROAS：${roas}｜CPA：${cpa}`,
     `本月配速：${pace}`,
+  ];
+
+  // 月底落點預測（有手動月預算才有）
+  const projection = summary.projection;
+  if (projection && projection.projectedEomSpend !== null) {
+    const ratioText =
+      projection.projectedRatio !== null
+        ? `（預算 ${Math.round(projection.projectedRatio * 100)}%）`
+        : "";
+    lines.push(
+      `預估月底：${formatCurrency(projection.projectedEomSpend)}${ratioText}`,
+    );
+  }
+
+  lines.push(
     `異常：${summary.alerts.length > 0 ? `${summary.alerts.length} 件` : "無"}`,
     `${appUrl}/daily`,
-  ].join("\n");
+  );
+  return lines.join("\n");
 }
 
 /** 異常提醒純文字備援 */

@@ -45,6 +45,8 @@ model UserSettings {
   linePushEnabled    Boolean @default(false)
   // 叮咚週報開關：獨立於日報/異常的 linePushEnabled，預設 false（寫完不會自動發，刻意的安全預設）
   weeklyReportEnabled Boolean @default(false)
+  // Notion 三個 database 的 ID（NotionDatabaseIds 結構，見 src/lib/notion/databases.ts；未驗證 JSON，讀出時過 parseNotionDatabaseIds 淨化）
+  notionDatabases Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -83,6 +85,8 @@ model SyncLog {
   adsAnalyzed    Int?
   alertsDetected Int?
   overallRoas    Float?
+  // 任務種類："page_sync"（既有日報頁面同步）| "notion_db_sync"（每日 Notion database 同步）
+  jobType        String      @default("page_sync")
 
   @@index([userId])
   @@index([status])
@@ -136,6 +140,7 @@ model AlertNotification {
 enum SyncStatus {
   RUNNING
   SUCCESS
+  PARTIAL // Notion db 同步的三個子任務部分成功
   FAILED
 }
 
@@ -171,6 +176,7 @@ model BudgetChangeLog {
   newValue      Float
   changePercent Float?
   note          String?
+  notionPageId  String?  // 已同步到 Notion 操作日誌 DB 的 page id；null = 未同步（去重錨點，見 notion 同步規格 §3.2）
   detectedAt    DateTime @default(now())
 
   @@index([userId])
@@ -188,8 +194,9 @@ model BudgetActionItem {
   severity          String    // "warning" | "critical"
   detail            Json      // { monthSpend, periodBudget, pacingRatio, monthlyBudget }
   status            String    @default("open") // "open" | "resolved" | "dismissed"
-  resolvedBy        String?   // "auto_detected_change" | "manual"
+  resolvedBy        String?   // "auto_detected_change" | "manual" | "pacing_recovered" | "notion_checkbox"
   linkedChangeLogId String?
+  notionPageId      String?   // 對應的 Notion 待辦 page id；null = 未推送
   createdAt         DateTime  @default(now())
   resolvedAt        DateTime?
 

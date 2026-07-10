@@ -119,7 +119,8 @@ async function runDailyDigestForUser(
   let budgetActionItemCount = 0;
   try {
     const violations = detectPacingOverspend(summary.accounts);
-    await syncPacingActionItems(settings.userId, violations);
+    // 帶入本次觀測到的帳號 → 配速回正／預算移除的 open 待辦自動結案
+    await syncPacingActionItems(settings.userId, violations, summary.accounts);
     await syncCampaignSnapshots(
       settings.userId,
       extractCampaignBudgets(records),
