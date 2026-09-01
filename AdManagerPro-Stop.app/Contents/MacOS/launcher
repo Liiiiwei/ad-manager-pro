@@ -1,14 +1,8 @@
 #!/bin/bash
-# Ad Manager Pro 停止器：停止服務（保留資料 volume）
+# Ad Manager Pro 停止器（原生版）：定位 node → 執行 stop.mjs。
 set -e
-
 PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
-
-notify() {
-  osascript -e "display notification \"$1\" with title \"Ad Manager Pro\"" >/dev/null 2>&1 || true
-}
-
+# shellcheck disable=SC1091
+source "$PROJECT_DIR/scripts/local-app/find-node.sh"
 cd "$PROJECT_DIR"
-notify "停止服務中..."
-docker compose down
-notify "已停止（資料保留）"
+exec "$NODE" scripts/local-app/stop.mjs
