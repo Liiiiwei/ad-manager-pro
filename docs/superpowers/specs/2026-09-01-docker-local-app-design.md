@@ -60,6 +60,17 @@ AdManagerPro.app (macOS .app bundle)
 - `src/lib/auth/clerk.ts`：dev fallback 判斷式同步改為「非 production **或** `LOCAL_NO_AUTH==="true"`」時啟用 fallback user。
 - 旗標**預設不存在**；Zeabur 正式站不設此旗標 → 行為與現在完全相同、預設安全。
 - 只有本機 `docker/.env.docker` 會設 `LOCAL_NO_AUTH=true`。
+- 為 DRY，抽出共用純函式 `isAuthBypassEnabled()`（`src/lib/auth/env.ts`），middleware 與 clerk.ts 共用。
+
+**免登入的兩顆隱藏地雷（調查後補入，原設計漏掉）**：光放行還不夠——Clerk 前端在「無 publishable key」時會於 render 直接丟錯，middleware 放行也救不了：
+
+- `src/app/layout.tsx:27` **無條件**包 `<ClerkProvider>`；無 key 時 provider 會拋錯。
+  → 改為「有 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` 才包 ClerkProvider，否則直接渲染子樹」。
+- `src/components/layout/sidebar.tsx:210` 用 `<UserButton>`（sidebar 在 layout 每頁都渲染），
+  無 Provider 時會拋「must be used within ClerkProvider」。
+  → 改為「有 key 才渲染 UserButton」。
+- 兩者都讀 `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`；Next.js 於 build 期把此 `NEXT_PUBLIC_*` 內聯：
+  本機 image build 未帶 key → 恆走無 Clerk 路徑（免登入）；Zeabur build 帶 key → 恆走 ClerkProvider 路徑，行為不變。
 
 理由：本機當工具天天用，正式伺服器頁面速度比 dev 伺服器有感；旗標預設關、對正式站零影響。
 （否決方案 B「容器內跑 next dev」：零程式改動但每頁即時編譯太慢，且 dev 伺服器定位不對。）
@@ -92,11 +103,18 @@ AdManagerPro.app (macOS .app bundle)
   build 步驟由 `npm run build`（含 `prisma db push`，build 時連不到 db 會失敗）
   改為 `npx prisma generate && npx next build`（db push 移到 entrypoint 於 runtime 執行）。
 - `src/middleware.ts`
-  放行條件加入 `LOCAL_NO_AUTH==="true"`（方案 A）。
+  放行條件加入 `LOCAL_NO_AUTH==="true"`（方案 A，用 `isAuthBypassEnabled()`）。
 - `src/lib/auth/clerk.ts`
-  dev fallback 條件加入 `LOCAL_NO_AUTH==="true"`（方案 A）。
+  dev fallback 條件加入 `LOCAL_NO_AUTH==="true"`（方案 A，用 `isAuthBypassEnabled()`）。
+- `src/app/layout.tsx`
+  條件式 `ClerkProvider`（有 key 才包）。
+- `src/components/layout/sidebar.tsx`
+  條件式 `UserButton`（有 key 才渲染）。
 - `.gitignore`
   加入 `docker/.env.docker`。
+
+新增：
+- `src/lib/auth/env.ts` — `isAuthBypassEnabled()` 純函式（middleware / clerk.ts 共用）。
 
 ## 本機環境變數（`docker/.env.docker`）
 
