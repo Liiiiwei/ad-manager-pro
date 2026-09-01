@@ -55,3 +55,8 @@ Thumbs.db
 # Playwright MCP debug logs
 .playwright-mcp/
 .gstack/
+
+# 本機 App（原生啟動器）
+.local-db/
+.local-app.pid
+.local-app.log

@@ -1,5 +1,9 @@
 # 本機 Docker 執行說明
 
+> ⚡ 預設用法已改為「原生本機 App」：雙擊 `AdManagerPro.app` 即可（首次會自動設定與 build）。
+> 改了程式碼要更新畫面 → 雙擊 `AdManagerPro-Rebuild.app`。停止 → 雙擊 `AdManagerPro-Stop.app`。
+> 需要 Node.js 20+（`brew install node`）。以下 Docker 內容改為進階/備援選項。
+
 雙擊一個 app 圖示，就能在自己的 Mac 上把 Ad Manager Pro（含資料庫）跑起來，免登入直接使用。
 
 ## 前置需求

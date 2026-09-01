@@ -1,0 +1,10 @@
+#!/bin/bash
+# Ad Manager Pro 重建器：重新 build 讓 App 反映最新程式碼。完成後請重開 App。
+set -e
+PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+# shellcheck disable=SC1091
+source "$PROJECT_DIR/scripts/local-app/find-node.sh"
+cd "$PROJECT_DIR"
+osascript -e 'display notification "重建中，完成後請重新開啟 App" with title "Ad Manager Pro"' >/dev/null 2>&1 || true
+"$NODE" scripts/local-app/setup.mjs --rebuild
+osascript -e 'display notification "重建完成，請重新開啟 Ad Manager Pro" with title "Ad Manager Pro"' >/dev/null 2>&1 || true
