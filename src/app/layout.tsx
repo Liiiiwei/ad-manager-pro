@@ -23,19 +23,25 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <ClerkProvider>
-      <html
-        lang="zh-TW"
-        className={`${GeistSans.variable} ${GeistMono.variable} ${bricolage.variable}`}
-      >
-        <body className="antialiased">
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 flex flex-col min-w-0">{children}</main>
-          </div>
-        </body>
-      </html>
-    </ClerkProvider>
+  const tree = (
+    <html
+      lang="zh-TW"
+      className={`${GeistSans.variable} ${GeistMono.variable} ${bricolage.variable}`}
+    >
+      <body className="antialiased">
+        <div className="flex min-h-screen">
+          <Sidebar />
+          <main className="flex-1 flex flex-col min-w-0">{children}</main>
+        </div>
+      </body>
+    </html>
+  );
+
+  // 有 Clerk 金鑰才包 ClerkProvider；本機免登入（無 key）直接渲染，
+  // 避免 ClerkProvider 於無 publishable key 時於 render 拋錯。
+  return process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+    <ClerkProvider>{tree}</ClerkProvider>
+  ) : (
+    tree
   );
 }

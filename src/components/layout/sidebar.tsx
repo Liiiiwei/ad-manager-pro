@@ -207,13 +207,18 @@ export default function Sidebar() {
       {/* 使用者區域 */}
       <div className="p-4 border-t border-white/10">
         <div className="flex items-center gap-3">
-          <UserButton
-            appearance={{
-              elements: {
-                avatarBox: "w-8 h-8",
-              },
-            }}
-          />
+          {process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ? (
+            <UserButton
+              appearance={{
+                elements: {
+                  avatarBox: "w-8 h-8",
+                },
+              }}
+            />
+          ) : (
+            // 免登入模式：無 Clerk 金鑰時以佔位頭像維持版面
+            <div className="w-8 h-8 rounded-full bg-white/10" aria-hidden />
+          )}
           <span className="text-xs text-sidebar-text truncate">我的帳號</span>
         </div>
       </div>
