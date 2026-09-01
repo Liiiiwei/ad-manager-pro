@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "app:build": "prisma generate && next build",
+    "app:setup": "node scripts/local-app/setup.mjs",
+    "app:start": "node scripts/local-app/start.mjs",
+    "app:stop": "node scripts/local-app/stop.mjs",
+    "app:rebuild": "node scripts/local-app/setup.mjs --rebuild"
   },
   "dependencies": {
     "@clerk/nextjs": "^7.3.0",
