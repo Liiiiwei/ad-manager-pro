@@ -1,0 +1,24 @@
+node_modules
+.next
+out
+build
+dist
+.git
+.gitignore
+coverage
+*.log
+# 不把任何 .env 打進 image（避免正式 Clerk 金鑰被 build 期內聯）
+.env
+.env*
+docker/.env.docker
+# 文件與工具設定，image 用不到
+docs
+.vscode
+.idea
+.claude
+.playwright-mcp
+.gstack
+.DS_Store
+# 根目錄截圖（勿用 *.png，會排掉 public/ 內的 app／PWA 圖示）
+/ad-structure.png
+/meta-link-buttons-verified.png

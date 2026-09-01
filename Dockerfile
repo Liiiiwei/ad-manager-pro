@@ -10,10 +10,14 @@ RUN npm ci
 # 複製其他原始碼
 COPY . .
 
-# build: prisma generate && prisma db push --skip-generate && next build
-RUN npm run build
+# build 不連 DB：只 generate client 與 next build；db push 移到 entrypoint（runtime）
+RUN npx prisma generate && npx next build
 
-ENV NODE_ENV=production
+# runtime 入口：等 DB → prisma db push → npm start
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
 EXPOSE 3000
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["npm", "start"]
