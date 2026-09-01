@@ -19,6 +19,8 @@
    ```
 3. **首次啟動並 build**（約數分鐘）：雙擊 `AdManagerPro.app`，或執行 `docker compose up -d --build`。
 
+> 首次啟動需 build image，約數分鐘，期間瀏覽器不會馬上打開，屬正常現象，請耐心等候；完成後會自動開到 `http://localhost:3000`。
+
 > `docker/.env.docker` 內含金鑰，已被 `.gitignore` 排除，切勿提交。
 
 ## 日常使用
