@@ -28,12 +28,16 @@ function alreadyRunning() {
   try { process.kill(pid, 0); return true; } catch { return false; }
 }
 
-// 輪詢等 Next 回應
+// 輪詢等 Next 回應；只有狀態碼 < 500 才算就緒（4xx 代表伺服器已起來、可放行；
+// 5xx 代表尚未就緒或程式錯誤，繼續等到逾時，避免把錯誤頁當成功靜默開瀏覽器）
 async function waitForPort(url, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    try { await fetch(url, { method: 'HEAD' }); return true; }
-    catch { await new Promise((r) => setTimeout(r, 500)); }
+    try {
+      const res = await fetch(url, { method: 'HEAD' });
+      if (res.status < 500) return true;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 500));
   }
   return false;
 }
