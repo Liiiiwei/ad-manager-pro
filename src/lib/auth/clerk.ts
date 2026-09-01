@@ -1,7 +1,8 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
-import { prisma } from '@/lib/db/prisma';
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { prisma } from "@/lib/db/prisma";
+import { isAuthBypassEnabled } from "@/lib/auth/env";
 
-const DEV_FALLBACK_ID = 'dev-local-user';
+const DEV_FALLBACK_ID = "dev-local-user";
 
 /**
  * 取得當前使用者的資料庫記錄（自動建立如果不存在）
@@ -9,7 +10,7 @@ const DEV_FALLBACK_ID = 'dev-local-user';
  */
 export async function getCurrentUser() {
   let userId: string | null = null;
-  let email = '';
+  let email = "";
 
   try {
     const authResult = await auth();
@@ -20,14 +21,14 @@ export async function getCurrentUser() {
 
   if (userId) {
     const clerkUser = await currentUser();
-    email = clerkUser?.emailAddresses[0]?.emailAddress || '';
+    email = clerkUser?.emailAddresses[0]?.emailAddress || "";
   } else {
-    // 開發環境 fallback
-    if (process.env.NODE_ENV !== 'production') {
+    // 免登入放行（本機／開發或 LOCAL_NO_AUTH=true）時使用 fallback user
+    if (isAuthBypassEnabled()) {
       userId = DEV_FALLBACK_ID;
-      email = 'dev@localhost';
+      email = "dev@localhost";
     } else {
-      throw new Error('未登入');
+      throw new Error("未登入");
     }
   }
 
