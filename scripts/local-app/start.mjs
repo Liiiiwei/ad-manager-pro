@@ -101,6 +101,7 @@ async function main() {
   process.on('SIGTERM', shutdown);
   process.on('SIGINT', shutdown);
   next.on('exit', shutdown); // Next 掛掉就一起收
+  next.on('error', shutdown); // spawn 失敗（找不到執行檔／權限）只發 error 不發 exit，一樣要收尾
 
   // 5. pidfile、等埠通、開瀏覽器
   writeFileSync(PID_FILE, String(process.pid));
