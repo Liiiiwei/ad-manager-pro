@@ -1,0 +1,39 @@
+#!/bin/bash
+# Ad Manager Pro 本機啟動器：確認 Docker → compose up → 開瀏覽器
+# 以自身 bundle 位置推導專案根目錄（.app 需放在 repo 根目錄）
+set -e
+
+PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
+URL="http://localhost:3000/dashboard"
+
+notify() {
+  osascript -e "display notification \"$1\" with title \"Ad Manager Pro\"" >/dev/null 2>&1 || true
+}
+
+# 1. 確認 Docker daemon 已啟動；沒開就嘗試開起來並等待（最多約 120 秒）
+if ! docker info >/dev/null 2>&1; then
+  notify "正在啟動 Docker Desktop..."
+  open -a Docker || {
+    osascript -e 'display alert "找不到 Docker Desktop" message "請先安裝 Docker Desktop 後再試。"'
+    exit 1
+  }
+  for _ in $(seq 1 60); do
+    docker info >/dev/null 2>&1 && break
+    sleep 2
+  done
+fi
+
+# 2. 啟動服務（首次會 build，需數分鐘）
+cd "$PROJECT_DIR"
+notify "啟動服務中，請稍候..."
+docker compose up -d --build
+
+# 3. 等 web 回應（最多約 120 秒）
+for _ in $(seq 1 60); do
+  curl -sf -o /dev/null "$URL" && break
+  sleep 2
+done
+
+# 4. 開瀏覽器
+notify "已就緒，開啟瀏覽器"
+open "$URL"

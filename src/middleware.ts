@@ -1,4 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
+import { isAuthBypassEnabled } from "@/lib/auth/env";
 
 const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
@@ -7,9 +8,9 @@ const isPublicRoute = createRouteMatcher([
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
-  // 正式環境缺少 Clerk 金鑰時，回傳 503 避免未授權存取
+  // 缺 Clerk 金鑰時：本機／開發或 LOCAL_NO_AUTH=true 放行；正式站回 503 擋未授權
   if (!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY) {
-    if (process.env.NODE_ENV === "production") {
+    if (!isAuthBypassEnabled()) {
       return new Response("Service misconfigured", { status: 503 });
     }
     return;
