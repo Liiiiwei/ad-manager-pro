@@ -13,6 +13,7 @@ import KpiCard from "@/components/dashboard/kpi-card";
 import SpendChart from "@/components/dashboard/spend-chart";
 import RoasChart from "@/components/dashboard/roas-chart";
 import AlertSummary from "@/components/dashboard/alert-summary";
+import PriorityWorkbench from "@/components/dashboard/priority-workbench";
 import EmptyState from "@/components/ui/empty-state";
 import LoadingSpinner from "@/components/ui/loading-spinner";
 import AccountFilter from "@/components/ui/account-filter";
@@ -165,9 +166,6 @@ function DashboardContent({
   } = useAnalysis(dateRange);
   const [accountFilter, setAccountFilter] = useState<string[]>([]);
 
-  const loading = dataLoading || analysisLoading;
-  const error = dataError || analysisError;
-
   const accountNames = useMemo(() => {
     const names = new Set(data.map((d) => d.account_name).filter(Boolean));
     return Array.from(names).sort();
@@ -191,12 +189,6 @@ function DashboardContent({
   }, [data, effectiveFilter, accountNames.length]);
 
   const filteredSummary = useMemo(() => {
-    if (
-      effectiveFilter.length === 0 ||
-      effectiveFilter.length === accountNames.length
-    ) {
-      return result?.summary;
-    }
     const totalSpend = filteredData.reduce((s, d) => s + d.spend, 0);
     const totalRevenue = filteredData.reduce((s, d) => s + d.revenue, 0);
     const totalConversions = filteredData.reduce(
@@ -230,22 +222,19 @@ function DashboardContent({
       })(),
     };
   }, [
-    effectiveFilter.length,
-    accountNames.length,
     filteredData,
-    result?.summary,
   ]);
 
-  if (loading) {
+  if (dataLoading) {
     return <LoadingSpinner message="正在載入廣告數據..." />;
   }
 
-  if (error) {
+  if (dataError) {
     return (
       <div className="flex-1 p-6">
         <div className="bg-red-50 border border-red-200 rounded-xl p-5 animate-fade-in">
           <p className="text-red-800 font-medium">載入失敗</p>
-          <p className="text-red-600 text-sm mt-1">{error}</p>
+          <p className="text-red-600 text-sm mt-1">{dataError}</p>
         </div>
       </div>
     );
@@ -258,6 +247,14 @@ function DashboardContent({
         accounts={accountNames}
         selected={effectiveFilter}
         onChange={setAccountFilter}
+      />
+
+      {/* 今日優先處理事項 */}
+      <PriorityWorkbench
+        alerts={result?.alerts ?? []}
+        data={filteredData}
+        loading={analysisLoading}
+        error={analysisError}
       />
 
       {/* KPI 卡片 - 響應式 */}
@@ -295,7 +292,11 @@ function DashboardContent({
       </div>
 
       {/* 警示摘要 */}
-      <AlertSummary alerts={result?.alerts ?? []} />
+      <AlertSummary
+        alerts={result?.alerts ?? []}
+        loading={analysisLoading}
+        error={analysisError}
+      />
     </div>
   );
 }
