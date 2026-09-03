@@ -1,9 +1,7 @@
-export type AlertSeverity = "critical" | "warning" | "info";
+// good＝正向狀態（表現良好），綠色；其餘為問題嚴重度（紅／琥珀／藍）
+export type AlertSeverity = "critical" | "warning" | "info" | "good";
 export type AlertCategory =
-  | "budget"
-  | "performance"
-  | "creative"
-  | "recommendation";
+  "budget" | "performance" | "creative" | "recommendation";
 
 export interface Alert {
   id: string;

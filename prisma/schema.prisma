@@ -22,6 +22,7 @@ model User {
   budgetSnapshots   BudgetSnapshot[]
   budgetChangeLogs  BudgetChangeLog[]
   budgetActionItems BudgetActionItem[]
+  resolvedAlerts    ResolvedAlert[]
 
   @@index([clerkId])
   @@index([email])
@@ -137,6 +138,21 @@ enum SyncStatus {
   RUNNING
   SUCCESS
   FAILED
+}
+
+/// 警示「已處理」標記（跨重算持久化）：即時分析的 Alert 用隨機 id，重算後就變，
+/// 所以標記不能綁 id。改用內容穩定的 alertKey（alertStableKey() 產生：
+/// category + metric + 帳號/活動/廣告組/廣告，U+001F 分隔），同一問題跨重算得同一把鍵。
+/// 以 (userId, alertKey) 唯一，userId 隔離不同使用者。
+model ResolvedAlert {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  alertKey   String
+  resolvedAt DateTime @default(now())
+
+  @@unique([userId, alertKey])
+  @@index([userId])
 }
 
 /// 預算數值快照（供比對用，每 (userId,scope,entityKey,budgetType) 只留最新一筆）

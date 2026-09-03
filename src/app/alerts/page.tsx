@@ -87,7 +87,7 @@ function AlertsContent({
   const { result, loading, error } = useAnalysis(datePreset);
   const [accountFilter, setAccountFilter] = useState<string[]>([]);
 
-  const alerts = result?.alerts ?? [];
+  const alerts = useMemo(() => result?.alerts ?? [], [result?.alerts]);
 
   // 取得所有帳號名稱
   const accountNames = useMemo(() => {

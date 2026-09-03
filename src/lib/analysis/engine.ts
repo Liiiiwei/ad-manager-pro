@@ -1,5 +1,10 @@
 import type { WindsorAdRecord } from "@/lib/windsor/types";
-import type { Alert, AnalysisResult, AnalysisThresholds, PlatformMetrics } from "./types";
+import type {
+  Alert,
+  AnalysisResult,
+  AnalysisThresholds,
+  PlatformMetrics,
+} from "./types";
 import { detectBudgetAnomalies } from "./budget-anomaly";
 import { detectPerformanceDecline } from "./performance";
 import { detectCreativeFatigue } from "./creative-fatigue";
@@ -10,6 +15,7 @@ const SEVERITY_ORDER: Record<string, number> = {
   critical: 0,
   warning: 1,
   info: 2,
+  good: 3, // 正向通知排最後，讓待處理問題先浮上來
 };
 
 /** 執行完整分析 */
@@ -22,9 +28,15 @@ export function runFullAnalysis(
 
   // 執行四個分析模組
   const budgetAlerts = detectBudgetAnomalies(data, thresholds.budget);
-  const performanceAlerts = detectPerformanceDecline(data, thresholds.performance);
+  const performanceAlerts = detectPerformanceDecline(
+    data,
+    thresholds.performance,
+  );
   const creativeAlerts = detectCreativeFatigue(data, thresholds.creative);
-  const recommendations = generateRecommendations(data, thresholds.recommendation);
+  const recommendations = generateRecommendations(
+    data,
+    thresholds.recommendation,
+  );
 
   // 合併並排序（critical 優先）
   const alerts = [
@@ -33,7 +45,8 @@ export function runFullAnalysis(
     ...creativeAlerts,
     ...recommendations,
   ].sort((a, b) => {
-    const severityDiff = SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
+    const severityDiff =
+      SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity];
     if (severityDiff !== 0) return severityDiff;
     return new Date(b.detectedAt).getTime() - new Date(a.detectedAt).getTime();
   });
@@ -74,9 +87,10 @@ function calculateSummary(data: WindsorAdRecord[]) {
   };
 }
 
-function calculatePlatformBreakdown(
-  data: WindsorAdRecord[],
-): { meta: PlatformMetrics; google: PlatformMetrics } {
+function calculatePlatformBreakdown(data: WindsorAdRecord[]): {
+  meta: PlatformMetrics;
+  google: PlatformMetrics;
+} {
   const metaData = data.filter(
     (r) => r.source.includes("facebook") || r.source.includes("instagram"),
   );

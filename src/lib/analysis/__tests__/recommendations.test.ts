@@ -59,15 +59,15 @@ describe("generateRecommendations", () => {
     expect(alerts).toHaveLength(0);
   });
 
-  it("ROAS 高於擴量門檻時產生擴量建議", () => {
+  it("ROAS 高於擴量門檻時產生「表現良好」正向通知（綠色 severity good）", () => {
     const data = [
       makeRecord({ date: "2026-01-01", spend: 200, roas: 5 }),
       makeRecord({ date: "2026-01-02", spend: 200, roas: 5 }),
     ];
     const alerts = generateRecommendations(data, defaultThresholds);
-    const scaleAlerts = alerts.filter((a) => a.title.includes("擴量"));
-    expect(scaleAlerts).toHaveLength(1);
-    expect(scaleAlerts[0].severity).toBe("info");
+    const goodAlerts = alerts.filter((a) => a.title.includes("表現良好"));
+    expect(goodAlerts).toHaveLength(1);
+    expect(goodAlerts[0].severity).toBe("good");
   });
 
   it("ROAS 持續低於停止門檻且連續 3 天以上時產生停止建議", () => {
@@ -114,7 +114,7 @@ describe("generateRecommendations", () => {
       makeRecord({ date: "2026-01-02", campaign: "", spend: 200, roas: 5 }),
     ];
     const alerts = generateRecommendations(data, defaultThresholds);
-    const scaleAlerts = alerts.filter((a) => a.title.includes("擴量"));
-    expect(scaleAlerts[0].campaignName).toBe("unknown");
+    const goodAlerts = alerts.filter((a) => a.title.includes("表現良好"));
+    expect(goodAlerts[0].campaignName).toBe("unknown");
   });
 });

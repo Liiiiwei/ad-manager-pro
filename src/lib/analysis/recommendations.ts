@@ -31,13 +31,14 @@ export function generateRecommendations(
       (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
     );
 
-    // 建議擴量：ROAS 高且穩定
+    // 表現良好：ROAS 高且花費達標（門檻 minSpendForDecision 已在上方過濾小花費雜訊）
+    // 正向通知（severity good，綠色），與紅／琥珀的問題警示區隔，讓使用者也看得到做對的活動
     if (avgRoas >= thresholds.scaleRoasMin) {
       alerts.push({
         id: generateId(),
         category: "recommendation",
-        severity: "info",
-        title: `${campaignName} 建議擴量`,
+        severity: "good",
+        title: `${campaignName} 表現良好`,
         description: `平均 ROAS ${avgRoas.toFixed(2)}x（門檻 ${thresholds.scaleRoasMin}x），花費 $${totalSpend.toFixed(2)}，營收 $${totalRevenue.toFixed(2)}`,
         metric: "roas",
         currentValue: avgRoas,
@@ -54,8 +55,13 @@ export function generateRecommendations(
     // 建議停止：ROAS 持續低於門檻
     if (avgRoas <= thresholds.killRoasMax) {
       // 檢查是否連續 3 天以上 ROAS 低
-      const lowRoasDays = sorted.filter((r) => r.roas <= thresholds.killRoasMax);
-      const consecutiveLow = countConsecutiveLowDays(sorted, thresholds.killRoasMax);
+      const lowRoasDays = sorted.filter(
+        (r) => r.roas <= thresholds.killRoasMax,
+      );
+      const consecutiveLow = countConsecutiveLowDays(
+        sorted,
+        thresholds.killRoasMax,
+      );
 
       if (consecutiveLow >= 3 || lowRoasDays.length >= sorted.length * 0.7) {
         alerts.push({
@@ -100,7 +106,8 @@ export function generateRecommendations(
           platform,
           campaignName,
           detectedAt: sorted[sorted.length - 1].date,
-          recommendation: "ROAS 正在下滑，建議調整出價或更新素材，若持續下降考慮暫停",
+          recommendation:
+            "ROAS 正在下滑，建議調整出價或更新素材，若持續下降考慮暫停",
         });
       }
     }
@@ -128,7 +135,9 @@ function countConsecutiveLowDays(
   return maxConsecutive;
 }
 
-function groupByCampaign(data: WindsorAdRecord[]): Record<string, WindsorAdRecord[]> {
+function groupByCampaign(
+  data: WindsorAdRecord[],
+): Record<string, WindsorAdRecord[]> {
   const map: Record<string, WindsorAdRecord[]> = {};
   for (const record of data) {
     const key = record.campaign || "unknown";
@@ -139,7 +148,8 @@ function groupByCampaign(data: WindsorAdRecord[]): Record<string, WindsorAdRecor
 }
 
 function toPlatform(source: string): "meta" | "google" | "all" {
-  if (source.includes("facebook") || source.includes("instagram")) return "meta";
+  if (source.includes("facebook") || source.includes("instagram"))
+    return "meta";
   if (source.includes("google")) return "google";
   return "all";
 }

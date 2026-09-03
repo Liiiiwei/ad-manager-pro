@@ -7,7 +7,10 @@ export function buildDailyReportContent(analysis: AnalysisResult): string {
 
   const criticalAlerts = alerts.filter((a) => a.severity === "critical");
   const warningAlerts = alerts.filter((a) => a.severity === "warning");
-  const infoAlerts = alerts.filter((a) => a.severity === "info");
+  // info 與 good（表現良好）都放「建議行動」段，避免正向通知讓既有擴量建議從 Notion 報告消失
+  const infoAlerts = alerts.filter(
+    (a) => a.severity === "info" || a.severity === "good",
+  );
 
   const sections: string[] = [];
 
@@ -73,7 +76,11 @@ ${infoAlerts.map(formatAlertItem).join("\n\n")}`);
 
 function formatAlertItem(alert: Alert): string {
   const platformLabel =
-    alert.platform === "meta" ? "Meta" : alert.platform === "google" ? "Google" : "全平台";
+    alert.platform === "meta"
+      ? "Meta"
+      : alert.platform === "google"
+        ? "Google"
+        : "全平台";
 
   return `**${alert.title}** (${platformLabel})
 > ${alert.description}
@@ -81,6 +88,9 @@ function formatAlertItem(alert: Alert): string {
 }
 
 /** 產生報告標題 */
-export function buildReportTitle(dateRange: { from: string; to: string }): string {
+export function buildReportTitle(dateRange: {
+  from: string;
+  to: string;
+}): string {
   return `${dateRange.from} ~ ${dateRange.to} 廣告最佳化報告`;
 }
