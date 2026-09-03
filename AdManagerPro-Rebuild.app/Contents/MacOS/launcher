@@ -6,5 +6,6 @@ PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 source "$PROJECT_DIR/scripts/local-app/find-node.sh"
 cd "$PROJECT_DIR"
 osascript -e 'display notification "重建中，完成後請重新開啟 App" with title "Ad Manager Pro"' >/dev/null 2>&1 || true
-"$NODE" scripts/local-app/setup.mjs --rebuild
+# NODE_ARCH_PREFIX 由 find-node.sh 決定，確保 build 以原生架構執行；build 輸出導入 log 方便除錯。
+"${NODE_ARCH_PREFIX[@]}" "$NODE" scripts/local-app/setup.mjs --rebuild > "$PROJECT_DIR/.local-app.log" 2>&1
 osascript -e 'display notification "重建完成，請重新開啟 Ad Manager Pro" with title "Ad Manager Pro"' >/dev/null 2>&1 || true

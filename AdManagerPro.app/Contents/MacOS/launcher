@@ -5,4 +5,12 @@ PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 # shellcheck disable=SC1091
 source "$PROJECT_DIR/scripts/local-app/find-node.sh"
 cd "$PROJECT_DIR"
-exec "$NODE" scripts/local-app/start.mjs
+# Finder 雙擊時 stdout 不進終端機，導出 log 方便除錯；每次啟動覆寫成本次紀錄。
+# NODE_ARCH_PREFIX 由 find-node.sh 決定，確保以原生架構執行（避免 embedded-postgres 架構不符）。
+#
+# 用背景 & 啟動 supervisor（不要用 exec）：exec 會讓長駐的 node 伺服器繼承本 .app 的
+# LaunchServices 註冊，使 app 一直被視為「執行中」的無視窗 UIElement；再次雙擊時
+# LaunchServices 會去喚醒這個無視窗進程而失敗，回 _LSOpenURLsWithCompletionHandler
+# error -600，Finder 顯示「應用程式並未打開」。改用背景 fork（新 PID，不帶 app 身份）＋
+# nohup 防 SIGHUP，launcher 隨即正常結束；重複雙擊都能正常開啟。
+nohup "${NODE_ARCH_PREFIX[@]}" "$NODE" scripts/local-app/start.mjs > "$PROJECT_DIR/.local-app.log" 2>&1 &

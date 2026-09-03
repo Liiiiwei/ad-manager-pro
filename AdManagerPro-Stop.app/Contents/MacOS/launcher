@@ -5,4 +5,5 @@ PROJECT_DIR="$(cd "$(dirname "$0")/../../.." && pwd)"
 # shellcheck disable=SC1091
 source "$PROJECT_DIR/scripts/local-app/find-node.sh"
 cd "$PROJECT_DIR"
-exec "$NODE" scripts/local-app/stop.mjs
+# NODE_ARCH_PREFIX 由 find-node.sh 決定，與啟動器用同一原生架構執行，行為一致。
+exec "${NODE_ARCH_PREFIX[@]}" "$NODE" scripts/local-app/stop.mjs

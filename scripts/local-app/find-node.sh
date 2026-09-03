@@ -30,3 +30,27 @@ if [ -z "$NODE" ]; then
 fi
 export NODE
 export PATH="$(dirname "$NODE"):$PATH"
+
+# 決定執行架構：Finder／LaunchServices 雙擊時，可能把「通用二進位 node」以非原生
+# slice 執行（實測：arm64 機器上被以 x86_64 執行），使 process.arch 與 npm install 當時
+# 選到的原生模組 binary（embedded-postgres 的 @embedded-postgres/darwin-arm64）不符而崩潰
+# （ERR_MODULE_NOT_FOUND: Cannot find package '@embedded-postgres/darwin-x64'）。
+# 對策：讓 node 的執行架構對齊 node_modules 內實際安裝的 embedded-postgres 平台二進位——
+# 這是地面真相（npm install 依當時 process.arch 只裝一個）。
+# 注意：不能用 uname -m 判硬體——它回報「當前程序」架構，本檔被以 x86_64 啟動時就回 x86_64，
+# 反而選錯。故改看已安裝的 binary 目錄名。
+# 用 BASH_SOURCE 定位本檔所在，往上兩層即專案根，避免依賴呼叫端的變數。
+# 供 source 本檔的 launcher 用：exec "${NODE_ARCH_PREFIX[@]}" "$NODE" ...
+NODE_ARCH_PREFIX=()
+_fn_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+_ep_dir="$_fn_root/node_modules/@embedded-postgres"
+_want_arch=""
+if [ -d "$_ep_dir/darwin-arm64" ]; then
+  _want_arch="arm64"
+elif [ -d "$_ep_dir/darwin-x64" ]; then
+  _want_arch="x86_64"
+fi
+# 僅在能以該架構實際跑起 node 時才加前綴（功能測試）；否則交回系統預設，不強制。
+if [ -n "$_want_arch" ] && arch -"$_want_arch" "$NODE" -e '' >/dev/null 2>&1; then
+  NODE_ARCH_PREFIX=(arch -"$_want_arch")
+fi
