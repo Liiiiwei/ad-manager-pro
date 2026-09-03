@@ -9,6 +9,7 @@ import { memo, useCallback } from "react";
 import { Handle, Position } from "@xyflow/react";
 import type { NodeProps } from "@xyflow/react";
 import type { NodeLevel, TreeNodeMetrics } from "@/lib/ad-structure/types";
+import { buildAdsetLink, buildAdLink } from "@/lib/ad-structure/meta-link";
 
 /** 節點 data 介面 */
 export interface AdStructureNodeData {
@@ -23,6 +24,11 @@ export interface AdStructureNodeData {
   isPausedGroup?: boolean;
   activeChildCount?: number;
   activeAdCount?: number;
+  // Meta 原生數字 ID（用於串連 Ads Manager 編輯連結；僅該層級以上有值）
+  accountId?: string;
+  campaignId?: string;
+  adsetId?: string;
+  adId?: string;
   onToggle?: (id: string) => void;
   onSelect?: (id: string) => void;
   [key: string]: unknown;
@@ -95,12 +101,25 @@ function AdStructureNodeComponent({ id, data }: NodeProps) {
     isPausedGroup,
     activeChildCount,
     activeAdCount,
+    accountId,
+    campaignId,
+    adsetId,
+    adId,
     onToggle,
     onSelect,
   } = data as AdStructureNodeData;
 
   const badge = platformBadge(platform);
   const hasAlerts = alertCount > 0;
+
+  // 僅 Meta 來源、且該層級必要 ID 齊全時才產生 Ads Manager 連結
+  const isMeta = platform === "meta";
+  const metaLink =
+    isMeta && level === "adset"
+      ? buildAdsetLink({ accountId, campaignId, adsetId })
+      : isMeta && level === "ad"
+        ? buildAdLink({ accountId, campaignId, adsetId, adId })
+        : null;
 
   const handleToggle = useCallback(
     (e: React.MouseEvent) => {
@@ -113,6 +132,10 @@ function AdStructureNodeComponent({ id, data }: NodeProps) {
   const handleSelect = useCallback(() => {
     onSelect?.(id);
   }, [id, onSelect]);
+
+  const handleMetaLinkClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+  }, []);
 
   return (
     <div
@@ -175,13 +198,27 @@ function AdStructureNodeComponent({ id, data }: NodeProps) {
         )}
       </div>
 
-      {/* 節點名稱 */}
-      <p
-        className="text-sm font-semibold text-gray-800 truncate mb-2"
-        title={label}
-      >
-        {label}
-      </p>
+      {/* 節點名稱 + Meta Ads Manager 編輯連結 */}
+      <div className="flex items-center gap-1 mb-2">
+        <p
+          className="text-sm font-semibold text-gray-800 truncate flex-1"
+          title={label}
+        >
+          {label}
+        </p>
+        {metaLink && (
+          <a
+            href={metaLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={handleMetaLinkClick}
+            className="nodrag shrink-0 flex items-center justify-center w-5 h-5 rounded text-accent hover:bg-accent-light transition-colors text-xs leading-none"
+            title="在 Meta 廣告管理後台開啟"
+          >
+            ↗
+          </a>
+        )}
+      </div>
 
       {/* 活躍計數（campaign 與 adset 顯示） */}
       {!isPausedGroup && level === "campaign" && (

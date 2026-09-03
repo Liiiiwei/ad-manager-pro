@@ -27,7 +27,7 @@ type SortDir = "asc" | "desc";
 export default function CampaignTable({ data }: CampaignTableProps) {
   const [sortField, setSortField] = useState<SortField>("spend");
   const [sortDir, setSortDir] = useState<SortDir>("desc");
-  const [platformFilter, setPlatformFilter] = useState<string>("all");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const campaigns = useMemo(() => {
     const map: Record<string, CampaignRow> = {};
@@ -66,11 +66,17 @@ export default function CampaignTable({ data }: CampaignTableProps) {
   }, [data]);
 
   const filtered = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
     let result = campaigns;
-    if (platformFilter !== "all") {
-      result = result.filter((c) => c.platform === platformFilter);
+    if (query) {
+      result = result.filter((c) => {
+        return (
+          c.campaign.toLowerCase().includes(query) ||
+          c.platform.toLowerCase().includes(query)
+        );
+      });
     }
-    return result.sort((a, b) => {
+    return [...result].sort((a, b) => {
       const av = a[sortField];
       const bv = b[sortField];
       if (typeof av === "number" && typeof bv === "number") {
@@ -80,7 +86,7 @@ export default function CampaignTable({ data }: CampaignTableProps) {
         ? String(av).localeCompare(String(bv))
         : String(bv).localeCompare(String(av));
     });
-  }, [campaigns, sortField, sortDir, platformFilter]);
+  }, [campaigns, sortField, sortDir, searchQuery]);
 
   function handleSort(field: SortField) {
     if (sortField === field) {
@@ -110,25 +116,38 @@ export default function CampaignTable({ data }: CampaignTableProps) {
 
   return (
     <div className="bg-card border border-card-border rounded-xl overflow-hidden animate-fade-in">
-      {/* 篩選列 */}
-      <div className="p-4 border-b border-card-border flex items-center gap-3">
-        <span className="text-sm text-muted">平台：</span>
-        {["all", "Meta", "Google"].map((p) => (
-          <button
-            key={p}
-            onClick={() => setPlatformFilter(p)}
-            className={`px-3 py-1 text-sm rounded-md transition-colors ${
-              platformFilter === p
-                ? "bg-accent text-white"
-                : "bg-gray-100 text-muted hover:text-foreground"
-            }`}
+      {/* 搜尋列 */}
+      <div className="p-4 border-b border-card-border flex flex-col sm:flex-row sm:items-center gap-3">
+        <div>
+          <p className="text-sm font-medium text-foreground">廣告活動</p>
+          <p className="text-xs text-muted mt-0.5">
+            共 {filtered.length} 個活動
+            {searchQuery.trim() && ` / 全部 ${campaigns.length} 個`}
+          </p>
+        </div>
+        <div className="sm:ml-auto relative w-full sm:w-72">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
           >
-            {p === "all" ? "全部" : p}
-          </button>
-        ))}
-        <span className="ml-auto text-sm text-muted">
-          共 {filtered.length} 個活動
-        </span>
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M21 21l-4.35-4.35m1.6-5.4a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
+          </svg>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="搜尋活動或平台"
+            className="w-full rounded-lg border border-card-border bg-white py-2 pl-9 pr-3 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent transition-shadow"
+          />
+        </div>
       </div>
 
       {/* 表格 */}
@@ -160,7 +179,13 @@ export default function CampaignTable({ data }: CampaignTableProps) {
                   <td
                     key={col.key}
                     className={`px-4 py-3 text-sm ${
-                      col.key === "roas" ? roasColor(row.roas) : "text-foreground"
+                      col.key === "campaign"
+                        ? "text-foreground max-w-[320px] truncate"
+                        : col.key === "roas"
+                          ? `font-mono tabular-nums whitespace-nowrap ${roasColor(row.roas)}`
+                          : typeof row[col.key] === "number"
+                            ? "text-foreground font-mono tabular-nums whitespace-nowrap"
+                            : "text-foreground whitespace-nowrap"
                     }`}
                   >
                     {col.format(row)}

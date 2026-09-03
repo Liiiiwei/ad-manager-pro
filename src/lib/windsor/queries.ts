@@ -12,6 +12,11 @@ const AD_PERFORMANCE_FIELDS = [
   "campaign_status",
   "adset_status",
   "ad_status",
+  // Meta 原生數字 ID（用於串連 Ads Manager 編輯連結）
+  "account_id",
+  "campaign_id",
+  "adset_id",
+  "ad_id",
   "spend",
   "impressions",
   "clicks",

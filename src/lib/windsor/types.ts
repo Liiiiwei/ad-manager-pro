@@ -85,6 +85,11 @@ const windsorRawSchema = z
     campaign_budget_remaining: nullableNumber(),
     // 帳戶幣別（用於換算成 TWD）；缺值時預設 TWD 不換算
     account_currency: nullableString("TWD"),
+    // Meta 原生數字 ID（用於串連 Ads Manager 編輯連結）
+    account_id: nullableString(""),
+    campaign_id: nullableString(""),
+    adset_id: nullableString(""),
+    ad_id: nullableString(""),
   })
   .passthrough();
 
@@ -121,6 +126,29 @@ export interface WindsorAdRecord {
   campaignLifetimeBudget: number;
   campaignDailyBudget: number;
   campaignBudgetRemaining: number;
+  // Meta 原生數字 ID（用於串連 Ads Manager 編輯連結）
+  // 選填：非 Meta 來源或既有測試手動建構的 fixture 不一定會帶這些欄位
+  accountId?: string;
+  campaignId?: string;
+  adsetId?: string;
+  adId?: string;
+}
+
+/**
+ * 正規化來源平台代碼。
+ * IG／FB 統一為 meta；並防禦 Windsor 偶爾把 Facebook CDN 圖片 URL
+ * （scontent／fbcdn）塞進 source 欄位的髒資料——這種值若直接透傳，
+ * 會在廣告架構的帳戶 badge 上顯示成一長串亂碼 URL。
+ * 已知平台代碼（如 google_ads、unknown）維持不變。
+ */
+function normalizeSource(raw: string): string {
+  const s = raw.toLowerCase();
+  if (s === "instagram" || s === "facebook" || s === "meta") return "meta";
+  // URL 型髒值（Facebook CDN 圖片連結）→ 屬 Meta 來源
+  if (s.startsWith("http") || s.includes("fbcdn") || s.includes("scontent")) {
+    return "meta";
+  }
+  return raw;
 }
 
 /** 將 Windsor 原始資料正規化為統一格式 */
@@ -135,11 +163,8 @@ export function normalizeRecord(
 
   return {
     date: raw.date,
-    // 將 IG/FB 統一視為 Meta 來源
-    source:
-      raw.source === "instagram" || raw.source === "facebook"
-        ? "meta"
-        : raw.source,
+    // 將 IG/FB 統一視為 Meta 來源，並清掉 URL 型髒值（見 normalizeSource）
+    source: normalizeSource(raw.source),
     account_name: raw.account_name,
     campaign: raw.campaign,
     // adset_name 為 Windsor API 實際回傳欄位，adset 為備援
@@ -170,6 +195,10 @@ export function normalizeRecord(
     campaignLifetimeBudget: (raw.campaign_lifetime_budget || 0) * rate,
     campaignDailyBudget: (raw.campaign_daily_budget || 0) * rate,
     campaignBudgetRemaining: (raw.campaign_budget_remaining || 0) * rate,
+    accountId: raw.account_id,
+    campaignId: raw.campaign_id,
+    adsetId: raw.adset_id,
+    adId: raw.ad_id,
   };
 }
 

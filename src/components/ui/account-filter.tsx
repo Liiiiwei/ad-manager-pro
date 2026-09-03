@@ -8,14 +8,21 @@ interface AccountFilterProps {
   onChange: (accounts: string[]) => void;
 }
 
-export default function AccountFilter({ accounts, selected, onChange }: AccountFilterProps) {
+export default function AccountFilter({
+  accounts,
+  selected,
+  onChange,
+}: AccountFilterProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // 點擊外部關閉下拉選單（必須在條件 return 之前呼叫）
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
         setIsOpen(false);
       }
     }
@@ -41,11 +48,12 @@ export default function AccountFilter({ accounts, selected, onChange }: AccountF
     }
   };
 
-  const displayText = selected.length === 0
-    ? "未選擇帳號"
-    : selected.length === accounts.length
-    ? "全部帳號"
-    : `已選 ${selected.length} 個帳號`;
+  const displayText =
+    selected.length === 0
+      ? "未選擇帳號"
+      : selected.length === accounts.length
+        ? "全部帳號"
+        : `已選 ${selected.length} 個帳號`;
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -64,7 +72,12 @@ export default function AccountFilter({ accounts, selected, onChange }: AccountF
             stroke="currentColor"
             viewBox="0 0 24 24"
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
           </svg>
         </button>
       </div>
@@ -84,18 +97,28 @@ export default function AccountFilter({ accounts, selected, onChange }: AccountF
           </div>
           <div className="p-2">
             {accounts.map((account) => (
-              <label
+              <div
                 key={account}
-                className="flex items-center gap-2 px-2 py-1.5 hover:bg-gray-50 rounded cursor-pointer"
+                className="flex items-center gap-1 px-2 py-1.5 hover:bg-gray-50 rounded"
               >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(account)}
-                  onChange={() => handleToggle(account)}
-                  className="rounded border-gray-300 text-accent focus:ring-accent"
-                />
-                <span className="text-sm">{account}</span>
-              </label>
+                <label className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(account)}
+                    onChange={() => handleToggle(account)}
+                    className="rounded border-gray-300 text-accent focus:ring-accent shrink-0"
+                  />
+                  <span className="text-sm truncate">{account}</span>
+                </label>
+                {/* 「僅」：一鍵只選這個帳號，免去逐一取消其他帳號 */}
+                <button
+                  type="button"
+                  onClick={() => onChange([account])}
+                  className="shrink-0 text-xs text-muted hover:text-accent border border-card-border hover:border-accent rounded px-1.5 py-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-accent"
+                >
+                  僅
+                </button>
+              </div>
             ))}
           </div>
         </div>

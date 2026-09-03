@@ -31,4 +31,9 @@ export interface TreeNode {
   activeChildCount?: number;
   /** 正在投放的不重複廣告素材名稱數（campaign 用，跨 adset 以 ad_name 去重） */
   activeAdCount?: number;
+  /** Meta 原生數字 ID（用於串連 Ads Manager 編輯連結；僅該層級以上有值） */
+  accountId?: string;
+  campaignId?: string;
+  adsetId?: string;
+  adId?: string;
 }

@@ -72,3 +72,29 @@ describe("normalizeRecord 貨幣換算", () => {
     expect(r.spend).toBe(1000);
   });
 });
+
+describe("normalizeRecord 來源正規化", () => {
+  it("instagram / facebook 統一為 meta", () => {
+    expect(normalizeRecord(makeRaw({ source: "instagram" })).source).toBe(
+      "meta",
+    );
+    expect(normalizeRecord(makeRaw({ source: "facebook" })).source).toBe(
+      "meta",
+    );
+  });
+
+  it("Windsor 髒資料：source 為 Facebook CDN 圖片 URL 時正規化為 meta（避免帳戶 badge 顯示亂碼）", () => {
+    const url =
+      "https://scontent.xx.fbcdn.net/v/t45.1600-4/abc_123.jpg?_nc_cat=1";
+    expect(normalizeRecord(makeRaw({ source: url })).source).toBe("meta");
+  });
+
+  it("google_ads 等已知平台代碼維持不變", () => {
+    expect(normalizeRecord(makeRaw({ source: "google_ads" })).source).toBe(
+      "google_ads",
+    );
+    expect(normalizeRecord(makeRaw({ source: "unknown" })).source).toBe(
+      "unknown",
+    );
+  });
+});

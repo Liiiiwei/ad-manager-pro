@@ -163,6 +163,8 @@ export function buildTree(
     Map<string, Map<string, WindsorAdRecord[]>>
   >();
   const accountPlatform = new Map<string, string>();
+  // 帳戶層級的 Meta 原生 ID（取該帳戶第一筆帶值的記錄）
+  const accountIdMap = new Map<string, string>();
 
   for (const r of records) {
     const accName = r.account_name || "未命名帳戶";
@@ -172,6 +174,9 @@ export function buildTree(
 
     if (!accountPlatform.has(accName)) {
       accountPlatform.set(accName, r.source);
+    }
+    if (!accountIdMap.get(accName) && r.accountId) {
+      accountIdMap.set(accName, r.accountId);
     }
 
     if (!accountMap.has(accName)) {
@@ -200,11 +205,20 @@ export function buildTree(
     for (const [campName, adsetMap] of campMap) {
       const adsetNodes: TreeNode[] = [];
       let campStatusRaw = "";
+      // 廣告活動層級的 Meta 原生 ID（取該活動第一筆帶值的記錄）
+      let campAccountId: string | undefined;
+      let campCampaignId: string | undefined;
 
       for (const [adsetName, adRecords] of adsetMap) {
         // 取得 adset/campaign 的 status（從任一筆記錄）
         const adsetStatusRaw = adRecords[0]?.adsetStatus || "";
         if (!campStatusRaw) campStatusRaw = adRecords[0]?.campaignStatus || "";
+        if (!campAccountId && adRecords[0]?.accountId) {
+          campAccountId = adRecords[0].accountId;
+        }
+        if (!campCampaignId && adRecords[0]?.campaignId) {
+          campCampaignId = adRecords[0].campaignId;
+        }
 
         const adMap = new Map<string, WindsorAdRecord[]>();
         for (const r of adRecords) {
@@ -247,6 +261,10 @@ export function buildTree(
             childCount: 0,
             children: [],
             status: adStatus,
+            accountId: dayRecords[0]?.accountId || undefined,
+            campaignId: dayRecords[0]?.campaignId || undefined,
+            adsetId: dayRecords[0]?.adsetId || undefined,
+            adId: dayRecords[0]?.adId || undefined,
           });
         }
 
@@ -278,6 +296,9 @@ export function buildTree(
           children: groupedAds,
           status: normalizeStatus(adsetStatusRaw),
           activeChildCount: activeAdCount,
+          accountId: adRecords[0]?.accountId || undefined,
+          campaignId: adRecords[0]?.campaignId || undefined,
+          adsetId: adRecords[0]?.adsetId || undefined,
         });
       }
 
@@ -319,6 +340,8 @@ export function buildTree(
         status: normalizeStatus(campStatusRaw),
         activeChildCount: activeAdsetCount,
         activeAdCount: activeAdNames.size,
+        accountId: campAccountId,
+        campaignId: campCampaignId,
       });
     }
 
@@ -344,6 +367,7 @@ export function buildTree(
       childCount: campaignNodes.length,
       children: groupedCampaigns,
       status: "ACTIVE",
+      accountId: accountIdMap.get(accName),
     });
   }
 

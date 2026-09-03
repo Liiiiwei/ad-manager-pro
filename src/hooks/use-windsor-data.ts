@@ -4,6 +4,28 @@ import { useState, useEffect, useCallback } from "react";
 import type { WindsorAdRecord } from "@/lib/windsor/types";
 import type { AnalysisResult } from "@/lib/analysis/types";
 
+const inFlightRequests = new Map<string, Promise<unknown>>();
+
+async function fetchJsonOnce<T>(url: string): Promise<T> {
+  const existing = inFlightRequests.get(url);
+  if (existing) return existing as Promise<T>;
+
+  const request = fetch(url)
+    .then(async (res) => {
+      const body = await res.json();
+      if (!res.ok) {
+        throw new Error(body.error || "請求失敗");
+      }
+      return body as T;
+    })
+    .finally(() => {
+      inFlightRequests.delete(url);
+    });
+
+  inFlightRequests.set(url, request);
+  return request;
+}
+
 /**
  * 檢查使用者是否已設定 Windsor API Key（透過 /api/settings GET）
  * 不回傳實際 key 值，僅回傳布林值供 UI 門控使用
@@ -16,16 +38,13 @@ export function useApiKey(): { hasApiKey: boolean; ready: boolean } {
     let cancelled = false;
     async function check() {
       try {
-        const res = await fetch("/api/settings");
-        if (!res.ok) {
-          setHasApiKey(false);
-          return;
-        }
-        const json = await res.json();
+        const json = await fetchJsonOnce<{ windsor?: { apiKey?: string } }>(
+          "/api/settings",
+        );
         // settings GET 回傳遮罩後的 key，有值代表已設定
-        setHasApiKey(!!json.windsor?.apiKey);
+        if (!cancelled) setHasApiKey(!!json.windsor?.apiKey);
       } catch {
-        setHasApiKey(false);
+        if (!cancelled) setHasApiKey(false);
       } finally {
         if (!cancelled) setReady(true);
       }
@@ -62,16 +81,8 @@ export function useWindsorData(
             : "all";
 
       const levelParam = level ? `&level=${level}` : "";
-      const res = await fetch(
-        `/api/windsor?connector=${connector}&dateRange=${dateRange}${levelParam}`,
-      );
-
-      if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error || "取得資料失敗");
-      }
-
-      const json = await res.json();
+      const url = `/api/windsor?connector=${connector}&dateRange=${dateRange}${levelParam}`;
+      const json = await fetchJsonOnce<{ data?: WindsorAdRecord[] }>(url);
       setData(json.data || []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知錯誤");
@@ -81,8 +92,36 @@ export function useWindsorData(
   }, [dateRange, platform, level]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const connector =
+          platform === "meta"
+            ? "facebook"
+            : platform === "google"
+              ? "google_ads"
+              : "all";
+
+        const levelParam = level ? `&level=${level}` : "";
+        const url = `/api/windsor?connector=${connector}&dateRange=${dateRange}${levelParam}`;
+        const json = await fetchJsonOnce<{ data?: WindsorAdRecord[] }>(url);
+        if (!cancelled) setData(json.data || []);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "未知錯誤");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange, platform, level]);
 
   return { data, loading, error, refetch: fetchData };
 }
@@ -98,14 +137,9 @@ export function useAnalysis(dateRange: string) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/analyze?dateRange=${dateRange}`);
-
-      if (!res.ok) {
-        const body = await res.json();
-        throw new Error(body.error || "分析失敗");
-      }
-
-      const json = await res.json();
+      const json = await fetchJsonOnce<AnalysisResult>(
+        `/api/analyze?dateRange=${dateRange}`,
+      );
       setResult(json);
     } catch (err) {
       setError(err instanceof Error ? err.message : "未知錯誤");
@@ -115,8 +149,29 @@ export function useAnalysis(dateRange: string) {
   }, [dateRange]);
 
   useEffect(() => {
-    fetchAnalysis();
-  }, [fetchAnalysis]);
+    let cancelled = false;
+
+    async function run() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const json = await fetchJsonOnce<AnalysisResult>(
+          `/api/analyze?dateRange=${dateRange}`,
+        );
+        if (!cancelled) setResult(json);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "未知錯誤");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [dateRange]);
 
   return { result, loading, error, refetch: fetchAnalysis };
 }
